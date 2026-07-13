@@ -1,3 +1,8 @@
+// True for the static build (GitHub Pages demo): data lives in localStorage
+// via localBackend.ts instead of the Node API. Statically replaced at build
+// time, so the unused code path is eliminated from the bundle.
+export const IS_LOCAL_BACKEND = import.meta.env.VITE_BACKEND === 'local';
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -8,11 +13,22 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, method: string, body?: unknown): Promise<T> {
+  if (IS_LOCAL_BACKEND) {
+    const { localRequest } = await import('./localBackend');
+    const { status, data } = await localRequest(path, method, body);
+    if (status >= 400) {
+      const d = data as Record<string, unknown>;
+      throw new ApiError(status, typeof d.error === 'string' ? d.error : 'UNKNOWN', d);
+    }
+    return data as T;
+  }
+
   const res = await fetch(path, {
+    method,
     credentials: 'same-origin',
-    headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
-    ...init,
+    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
@@ -22,10 +38,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }),
-  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  get: <T>(path: string) => request<T>(path, 'GET'),
+  post: <T>(path: string, body?: unknown) => request<T>(path, 'POST', body),
+  delete: <T>(path: string) => request<T>(path, 'DELETE'),
 };
 
 /** SQLite's datetime('now') is UTC without a timezone marker. */

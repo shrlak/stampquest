@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router';
 import { useAuth } from '../hooks/useAuth';
 import { usePlaces } from '../hooks/usePlaces';
 import { Button } from '../components/Button';
+import { IS_LOCAL_BACKEND } from '../lib/api';
 
 export default function ProfilePage() {
   const { user, stats, signOut } = useAuth();
@@ -56,17 +57,43 @@ export default function ProfilePage() {
         </ul>
       )}
 
-      <Button
-        variant="danger"
-        className="mt-8 w-full"
-        onClick={async () => {
-          await signOut();
-          navigate('/auth', { replace: true });
-        }}
-        data-testid="sign-out"
-      >
-        Sign out
-      </Button>
+      {IS_LOCAL_BACKEND ? (
+        <div className="mt-8">
+          <p className="mb-3 text-center text-xs text-ink-soft">
+            Demo mode — your passport is stored on this device only.
+          </p>
+          <Button
+            variant="danger"
+            className="w-full"
+            onClick={async () => {
+              if (
+                !window.confirm(
+                  'Reset your passport? All stamps and custom places on this device will be erased.',
+                )
+              ) {
+                return;
+              }
+              const { resetLocalData } = await import('../lib/localBackend');
+              resetLocalData();
+              window.location.reload();
+            }}
+          >
+            Reset passport
+          </Button>
+        </div>
+      ) : (
+        <Button
+          variant="danger"
+          className="mt-8 w-full"
+          onClick={async () => {
+            await signOut();
+            navigate('/auth', { replace: true });
+          }}
+          data-testid="sign-out"
+        >
+          Sign out
+        </Button>
+      )}
     </div>
   );
 }

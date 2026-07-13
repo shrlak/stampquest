@@ -1,5 +1,6 @@
 // Curated landmark roster. art_key maps to the client-side silhouette registry
 // (client/src/art/landmarks.ts) — keep the two in sync when adding landmarks.
+// Also mirrored in client/src/data/seedPlaces.ts for the static demo build.
 export interface SeedPlace {
   name: string;
   country: string;

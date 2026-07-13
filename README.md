@@ -50,6 +50,16 @@ One process serves everything: the built client, the SPA fallback, and the `/api
 
 **Deploying free:** the app is a single Node service, so Render/Fly.io/Railway free tiers all work. Two things to remember: (1) point `DATABASE_PATH` at a **persistent disk/volume** — ephemeral filesystems reset the database on every deploy; (2) serve over **HTTPS**, or geolocation (and Secure cookies) won't work.
 
+### GitHub Pages (static demo mode)
+
+Every push to the default branch runs `.github/workflows/deploy-pages.yml`, which publishes a static build to **https://shrlak.github.io/passport/**.
+
+GitHub Pages can't run the Node API, so this build swaps in a browser backend (`VITE_BACKEND=local`): you're auto-signed in as a local traveler, and stamps + custom places are stored in `localStorage` on the device (no accounts, no cross-device sync; the 500 m check runs client-side). Everything else is identical — and since Pages serves over HTTPS, GPS collecting and PWA install work great on phones.
+
+The workflow tries to enable Pages automatically on first deploy. If that run fails with a Pages/permissions error, enable it once by hand — repo **Settings → Pages → Source: GitHub Actions** — then re-run the workflow.
+
+To try the static build locally: `VITE_BACKEND=local npm run build -w client && npm run preview -w client`.
+
 ## How collecting works
 
 1. The client asks for your position (only ever after a button tap).
