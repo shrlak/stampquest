@@ -4,11 +4,13 @@
 import { COLLECT_RADIUS_M, PHOTO_RADIUS_M, haversineMeters } from './geo';
 import { idbDelete, idbGet, idbKeys, idbSet } from './idb';
 import { SEED_PLACES } from '../data/seedPlaces';
-import type { Place, Stamp, Stats, User } from '../types';
+import type { GeocodedLocation, Place, Stamp, Stats, User } from '../types';
 
 const GLOBAL_KEYS = {
   accounts: 'stampquest.local.accounts.v2',
   session: 'stampquest.local.session.v2',
+  geocodeCache: 'stampquest.local.geocode-cache.v1',
+  geocodeLastRequest: 'stampquest.local.geocode-last-request.v1',
 };
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,24}$/;
@@ -37,6 +39,12 @@ interface LocalResult {
   data: unknown;
 }
 
+interface NominatimResult {
+  lat?: unknown;
+  lon?: unknown;
+  display_name?: unknown;
+}
+
 function load<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -48,6 +56,77 @@ function load<T>(key: string, fallback: T): T {
 
 function store(key: string, value: unknown): void {
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+const normalizeSearchText = (value: string) =>
+  value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('en');
+
+let geocodeQueue: Promise<void> = Promise.resolve();
+
+async function geocodeWithNominatim(query: string): Promise<GeocodedLocation | null> {
+  const key = normalizeSearchText(query);
+  const cached = load<Record<string, GeocodedLocation | null>>(GLOBAL_KEYS.geocodeCache, {});
+  if (Object.hasOwn(cached, key)) return cached[key] ?? null;
+
+  let release: (() => void) | undefined;
+  const previous = geocodeQueue;
+  geocodeQueue = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
+
+  try {
+    const refreshed = load<Record<string, GeocodedLocation | null>>(
+      GLOBAL_KEYS.geocodeCache,
+      {},
+    );
+    if (Object.hasOwn(refreshed, key)) return refreshed[key] ?? null;
+
+    const lastRequest = load<number>(GLOBAL_KEYS.geocodeLastRequest, 0);
+    const remaining = 1_000 - (Date.now() - lastRequest);
+    if (remaining > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, remaining));
+    }
+    store(GLOBAL_KEYS.geocodeLastRequest, Date.now());
+
+    const endpoint = new URL(
+      import.meta.env.VITE_GEOCODER_URL ?? 'https://nominatim.openstreetmap.org/search',
+    );
+    endpoint.searchParams.set('q', query);
+    endpoint.searchParams.set('format', 'jsonv2');
+    endpoint.searchParams.set('limit', '1');
+    endpoint.searchParams.set('addressdetails', '0');
+    const response = await fetch(endpoint, {
+      headers: { Accept: 'application/json', 'Accept-Language': 'en' },
+    });
+    if (!response.ok) throw new Error(`Geocoder returned ${response.status}`);
+
+    const body = (await response.json()) as unknown;
+    const first = Array.isArray(body) ? (body[0] as NominatimResult | undefined) : undefined;
+    const lat = Number(first?.lat);
+    const lng = Number(first?.lon);
+    const match =
+      first &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lng) &&
+      Math.abs(lat) <= 90 &&
+      Math.abs(lng) <= 180
+        ? {
+            lat,
+            lng,
+            label:
+              typeof first.display_name === 'string' && first.display_name.trim()
+                ? first.display_name.trim()
+                : query,
+            source: 'openstreetmap' as const,
+          }
+        : null;
+    const entries = Object.entries({ ...refreshed, [key]: match });
+    store(GLOBAL_KEYS.geocodeCache, Object.fromEntries(entries.slice(-100)));
+    return match;
+  } finally {
+    release?.();
+  }
 }
 
 const accounts = () => load<LocalAccount[]>(GLOBAL_KEYS.accounts, []);
@@ -263,6 +342,52 @@ export async function localRequest(
     }
     await idbSet(profilePhotoKey(account.id), dataUrl);
     return ok({ user: publicUser(account, dataUrl) });
+  }
+
+  if (path === '/api/places/geocode' && method === 'POST') {
+    const { name, location, country } = b;
+    if (typeof name !== 'string' || !name.trim() || name.trim().length > 80) {
+      return fail(400, 'INVALID_NAME');
+    }
+    if (
+      typeof location !== 'string' ||
+      location.trim().length > 120 ||
+      typeof country !== 'string' ||
+      !country.trim() ||
+      country.trim().length > 60
+    ) {
+      return fail(400, 'INVALID_LOCATION_QUERY');
+    }
+
+    const normalizedCountry = normalizeSearchText(country);
+    const normalizedHints = [location, name]
+      .map((value) => normalizeSearchText(value))
+      .filter(Boolean);
+    const catalogMatch = SEED_PLACES.find((place) => {
+      if (normalizeSearchText(place.country) !== normalizedCountry) return false;
+      const placeName = normalizeSearchText(place.name);
+      return normalizedHints.some(
+        (hint) => hint === placeName || (placeName.length >= 4 && hint.includes(placeName)),
+      );
+    });
+    if (catalogMatch) {
+      return ok({
+        location: {
+          lat: catalogMatch.lat,
+          lng: catalogMatch.lng,
+          label: `${catalogMatch.name}, ${catalogMatch.country}`,
+          source: 'catalog',
+        } satisfies GeocodedLocation,
+      });
+    }
+
+    const query = [name.trim(), location.trim(), country.trim()].filter(Boolean).join(', ');
+    try {
+      const match = await geocodeWithNominatim(query);
+      return match ? ok({ location: match }) : fail(404, 'LOCATION_NOT_FOUND');
+    } catch {
+      return fail(502, 'GEOCODER_UNAVAILABLE');
+    }
   }
 
   if (path === '/api/places' && method === 'GET') {

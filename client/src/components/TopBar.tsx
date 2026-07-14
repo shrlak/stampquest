@@ -6,7 +6,21 @@ import { useGeo } from '../hooks/useGeolocation';
 
 export function TopBar() {
   const { user } = useAuth();
-  const { position } = useGeo();
+  const { position, loading, ready, onboardingComplete } = useGeo();
+  const locationStatus = position
+    ? {
+        label: 'Location available',
+        color: 'bg-olive shadow-[0_0_0_4px_rgba(52,199,89,0.12)]',
+      }
+    : loading || !ready || !onboardingComplete
+      ? {
+          label: 'Location pending',
+          color: 'bg-mustard shadow-[0_0_0_4px_rgba(255,159,10,0.12)]',
+        }
+      : {
+          label: 'Location unavailable',
+          color: 'bg-terracotta shadow-[0_0_0_4px_rgba(255,69,58,0.12)]',
+        };
   return (
     <header className="pointer-events-none fixed top-0 left-1/2 z-30 w-full max-w-md -translate-x-1/2 px-3 pt-[calc(env(safe-area-inset-top)+0.55rem)]">
       <div className="pointer-events-auto flex h-15 items-center justify-between rounded-[21px] border border-white/75 bg-white/78 px-3.5 shadow-[0_12px_38px_rgba(24,32,52,0.12)] backdrop-blur-2xl backdrop-saturate-150">
@@ -16,12 +30,15 @@ export function TopBar() {
           data-testid="topbar-home"
         >
           <BrandMark size={30} />
-          <span>
+          <span className="flex items-center gap-2">
             <span className="block font-display text-[16px] leading-none">StampQuest</span>
-            <span className="mt-1 flex items-center gap-1 text-[9px] font-semibold tracking-[0.08em] text-ink-soft uppercase">
-              <span className={`h-1.5 w-1.5 rounded-full ${position ? 'bg-olive' : 'bg-ink/20'}`} />
-              {position ? 'Location ready' : 'Photo mode'}
-            </span>
+            <span
+              className={`h-2.5 w-2.5 shrink-0 rounded-full transition-colors ${locationStatus.color}`}
+              role="status"
+              aria-label={locationStatus.label}
+              title={locationStatus.label}
+              data-testid="location-status"
+            />
           </span>
         </Link>
         <Link

@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { db, type PlaceRow, type StampRow } from '../db.js';
 import { currentUser, requireAuth } from '../auth.js';
 import { COLLECT_RADIUS_M, PHOTO_RADIUS_M, haversineMeters } from '../geo.js';
+import { geocode } from '../geocode.js';
 import { LANDMARK_CHECK_ENABLED, verifyLandmarkPhoto } from '../landmark.js';
 
 export const placesRouter = Router();
@@ -102,6 +103,66 @@ placesRouter.get('/', (_req, res) => {
   });
 });
 
+const normalizeSearchText = (value: string) =>
+  value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('en');
+
+placesRouter.post('/geocode', async (req, res) => {
+  const { name, location, country } = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof name !== 'string' || !name.trim() || name.trim().length > 80) {
+    res.status(400).json({ error: 'INVALID_NAME' });
+    return;
+  }
+  if (
+    typeof location !== 'string' ||
+    location.trim().length > 120 ||
+    typeof country !== 'string' ||
+    !country.trim() ||
+    country.trim().length > 60
+  ) {
+    res.status(400).json({ error: 'INVALID_LOCATION_QUERY' });
+    return;
+  }
+
+  const normalizedCountry = normalizeSearchText(country);
+  const normalizedHints = [location, name]
+    .map((value) => normalizeSearchText(value))
+    .filter(Boolean);
+  const curated = db
+    .prepare('SELECT * FROM places WHERE is_curated = 1')
+    .all() as PlaceRow[];
+  const catalogMatch = curated.find((place) => {
+    if (normalizeSearchText(place.country) !== normalizedCountry) return false;
+    const placeName = normalizeSearchText(place.name);
+    return normalizedHints.some(
+      (hint) => hint === placeName || (placeName.length >= 4 && hint.includes(placeName)),
+    );
+  });
+  if (catalogMatch) {
+    res.json({
+      location: {
+        lat: catalogMatch.lat,
+        lng: catalogMatch.lng,
+        label: `${catalogMatch.name}, ${catalogMatch.country}`,
+        source: 'catalog',
+      },
+    });
+    return;
+  }
+
+  const query = [name.trim(), location.trim(), country.trim()].filter(Boolean).join(', ');
+  try {
+    const match = await geocode(query);
+    if (!match) {
+      res.status(404).json({ error: 'LOCATION_NOT_FOUND' });
+      return;
+    }
+    res.json({ location: match });
+  } catch (error) {
+    console.error('Place geocoding failed', error);
+    res.status(502).json({ error: 'GEOCODER_UNAVAILABLE' });
+  }
+});
+
 placesRouter.post('/', (req, res) => {
   const user = currentUser(res);
   const { name, country, description, lat, lng } = (req.body ?? {}) as Record<
@@ -157,7 +218,7 @@ placesRouter.delete('/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// A collected stamp starts blank; the user's own photo becomes the stamp art.
+// A personal photo replaces the built-in illustration as the stamp art.
 placesRouter.put('/:id/photo', (req, res) => {
   const user = currentUser(res);
   const place = visiblePlace(req.params.id, user.id);

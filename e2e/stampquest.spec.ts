@@ -15,6 +15,10 @@ const password = 'wanderlust1';
 const TEST_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
+// 2×2 JPEG with EXIF GPS at the Eiffel Tower (48.8584, 2.2945).
+const TEST_GPS_JPEG_BASE64 =
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/4QCIRXhpZgAATU0AKgAAAAgAAYglAAQAAAABAAAAGgAAAAAABAABAAIAAAACTgAAAAACAAUAAAADAAAAUAADAAIAAAACRQAAAAAEAAUAAAADAAAAaAAAAAAAAAAwAAAAAQAAADMAAAABAAAC9AAAABkAAAACAAAAAQAAABEAAAABAAAAyQAAAAX/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDRooor54+vP//Z';
+
 test.describe.configure({ mode: 'serial' });
 
 test('register, collect at the Eiffel Tower, add a custom place', async ({ page }) => {
@@ -32,9 +36,13 @@ test('register, collect at the Eiffel Tower, add a custom place', async ({ page 
   // Location is requested once, immediately after authentication, then kept
   // for the account until sign-out instead of being requested place by place.
   await expect(page.getByTestId('location-onboarding')).toBeVisible();
+  await expect(page.getByTestId('location-status')).toHaveAttribute('aria-label', 'Location pending');
+  await expect(page.getByTestId('location-status')).toHaveCSS('background-color', 'rgb(255, 159, 10)');
   await page.getByTestId('location-enable').click();
   await expect(page.getByTestId('location-onboarding')).toHaveCount(0);
-  await expect(page.getByTestId('topbar-home')).toContainText('Location ready');
+  await expect(page.getByTestId('location-status')).toHaveAttribute('aria-label', 'Location available');
+  await expect(page.getByTestId('location-status')).toHaveCSS('background-color', 'rgb(52, 199, 89)');
+  await expect(page.getByTestId('topbar-home')).not.toContainText('Location ready');
 
   // home landing page: stats strip + three category cards
   await expect(page.getByTestId('stats-strip')).toBeVisible();
@@ -94,7 +102,7 @@ test('register, collect at the Eiffel Tower, add a custom place', async ({ page 
   await expect(page.getByTestId('stats-strip')).toContainText(`1 / ${CURATED_COUNT}`);
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByTestId('location-onboarding')).toHaveCount(0);
-  await expect(page.getByTestId('topbar-home')).toContainText('Location ready');
+  await expect(page.getByTestId('location-status')).toHaveAttribute('aria-label', 'Location available');
   await page.goto(eiffelUrl);
   await expect(page.getByTestId('collected-line')).toBeVisible();
   await expect(page.getByTestId('stamp-photo')).toBeVisible();
@@ -121,12 +129,23 @@ test('register, collect at the Eiffel Tower, add a custom place', async ({ page 
   await expect(page.getByTestId('state-name')).toHaveText('Alabama');
   await page.getByTestId('back-button').click();
 
-  // custom place via the floating Add button, at current location, then collect it
+  // Custom-place location can come from photo EXIF or a typed lookup. The
+  // typed match intentionally overrides the photo before the place is saved.
   await page.getByTestId('add-fab').click();
   await expect(page.getByTestId('add-place-modal')).toBeVisible();
   await page.getByTestId('place-name').fill('Café de Flore');
+  await page.getByTestId('place-location-hint').fill('Eiffel Tower');
   await page.getByTestId('place-country').fill('France');
-  await expect(page.getByTestId('use-my-location')).toContainText('Using your saved location');
+  await page.getByTestId('place-photo-input').setInputFiles({
+    name: 'paris-gps.jpg',
+    mimeType: 'image/jpeg',
+    buffer: Buffer.from(TEST_GPS_JPEG_BASE64, 'base64'),
+  });
+  await expect(page.getByTestId('photo-location-status')).toContainText('Photo GPS found');
+  await expect(page.getByTestId('location-resolution')).toContainText('Photo location found');
+  await page.getByTestId('lookup-location').click();
+  await expect(page.getByTestId('location-resolution')).toContainText('Matched in StampQuest');
+  await expect(page.getByTestId('location-resolution')).toContainText('Eiffel Tower, France');
   await page.getByTestId('save-place').click();
   await expect(page.getByTestId('add-place-modal')).toHaveCount(0);
   await page.getByTestId('collect-button').click();
@@ -217,6 +236,8 @@ test('a photo with matching EXIF location collects a stamp remotely', async ({ p
   await expect(page.getByTestId('location-onboarding')).toBeVisible();
   await page.getByTestId('location-skip').click();
   await expect(page.getByTestId('location-onboarding')).toHaveCount(0);
+  await expect(page.getByTestId('location-status')).toHaveAttribute('aria-label', 'Location unavailable');
+  await expect(page.getByTestId('location-status')).toHaveCSS('background-color', 'rgb(255, 59, 48)');
   await expect(page.getByTestId('stats-strip')).toBeVisible();
 
   const png = `data:image/png;base64,${TEST_PNG_BASE64}`;

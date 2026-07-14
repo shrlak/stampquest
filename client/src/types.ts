@@ -37,3 +37,10 @@ export interface Place {
   createdAt: string;
   stamp: Stamp | null;
 }
+
+export interface GeocodedLocation {
+  lat: number;
+  lng: number;
+  label: string;
+  source: 'catalog' | 'openstreetmap';
+}
