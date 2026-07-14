@@ -32,7 +32,7 @@ export interface Place {
   isMine: boolean;
   artKey: string | null;
   category: PlaceCategory;
-  /** Full U.S. state name for the one-per-state collection; null otherwise. */
+  /** Full state name for state-level curated or personal places; null otherwise. */
   state: string | null;
   createdAt: string;
   stamp: Stamp | null;
@@ -43,4 +43,12 @@ export interface GeocodedLocation {
   lng: number;
   label: string;
   source: 'catalog' | 'openstreetmap';
+  category: PlaceCategory;
+  stateName: string | null;
+  bounds: {
+    south: number;
+    north: number;
+    west: number;
+    east: number;
+  } | null;
 }

@@ -3,12 +3,28 @@ export interface GeocodeMatch {
   lng: number;
   label: string;
   source: 'openstreetmap';
+  category: 'landmark' | 'city' | 'us-state';
+  stateName: string | null;
+  bounds: GeocodeBounds | null;
+}
+
+interface GeocodeBounds {
+  south: number;
+  north: number;
+  west: number;
+  east: number;
 }
 
 interface NominatimResult {
   lat?: unknown;
   lon?: unknown;
   display_name?: unknown;
+  name?: unknown;
+  addresstype?: unknown;
+  category?: unknown;
+  type?: unknown;
+  boundingbox?: unknown;
+  address?: unknown;
 }
 
 const cache = new Map<string, GeocodeMatch | null>();
@@ -26,6 +42,31 @@ function remember(key: string, value: GeocodeMatch | null) {
   }
 }
 
+function inferCategory(result: NominatimResult): GeocodeMatch['category'] {
+  const addressType = typeof result.addresstype === 'string' ? result.addresstype : '';
+  const type = typeof result.type === 'string' ? result.type : '';
+  const classification = `${addressType} ${type}`.toLocaleLowerCase('en');
+  if (/\b(state|province|region)\b/.test(classification)) return 'us-state';
+  if (/\b(city|town|village|municipality|borough)\b/.test(classification)) return 'city';
+  return 'landmark';
+}
+
+function parseBounds(value: unknown): GeocodeBounds | null {
+  if (!Array.isArray(value) || value.length !== 4) return null;
+  const [south, north, west, east] = value.map(Number);
+  if (
+    ![south, north, west, east].every(Number.isFinite) ||
+    south < -90 ||
+    south > north ||
+    north > 90 ||
+    west < -180 ||
+    east > 180
+  ) {
+    return null;
+  }
+  return { south, north, west, east };
+}
+
 async function requestNominatim(query: string): Promise<GeocodeMatch | null> {
   const endpoint = new URL(
     process.env.GEOCODER_URL ?? 'https://nominatim.openstreetmap.org/search',
@@ -33,7 +74,7 @@ async function requestNominatim(query: string): Promise<GeocodeMatch | null> {
   endpoint.searchParams.set('q', query);
   endpoint.searchParams.set('format', 'jsonv2');
   endpoint.searchParams.set('limit', '1');
-  endpoint.searchParams.set('addressdetails', '0');
+  endpoint.searchParams.set('addressdetails', '1');
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8_000);
@@ -63,6 +104,19 @@ async function requestNominatim(query: string): Promise<GeocodeMatch | null> {
     ) {
       return null;
     }
+    const category = inferCategory(first);
+    const address =
+      first.address && typeof first.address === 'object'
+        ? (first.address as Record<string, unknown>)
+        : {};
+    const stateName =
+      category === 'us-state'
+        ? typeof address.state === 'string'
+          ? address.state
+          : typeof first.name === 'string'
+            ? first.name
+            : null
+        : null;
     return {
       lat,
       lng,
@@ -71,6 +125,9 @@ async function requestNominatim(query: string): Promise<GeocodeMatch | null> {
           ? first.display_name.trim()
           : query,
       source: 'openstreetmap',
+      category,
+      stateName,
+      bounds: parseBounds(first.boundingbox),
     };
   } finally {
     clearTimeout(timeout);

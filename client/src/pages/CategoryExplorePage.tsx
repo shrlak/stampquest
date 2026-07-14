@@ -51,9 +51,9 @@ const CATEGORY_META: Record<
     icon: 'M3 21V9l4-2v3l4-2v3l4-2v11H3Zm2-2h2v-2H5v2Zm0-4h2v-2H5v2Zm4 4h2v-2H9v2Zm0-4h2v-2H9v2Zm4 4h2v-2h-2v2ZM17 12h4v9h-4v-9Zm1 5h2v-2h-2v2Z',
   },
   'us-state': {
-    title: 'US States',
-    kicker: 'Fifty great stops',
-    description: 'One iconic place in every state, from coastlines to mountain summits.',
+    title: 'States',
+    kicker: 'Big chapters, one stamp',
+    description: 'The fifty-state collection, plus the state-level places you add.',
     placeholder: 'Search states…',
     noun: 'states',
     center: [39.5, -98.5],

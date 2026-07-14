@@ -107,7 +107,7 @@ const normalizeSearchText = (value: string) =>
   value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('en');
 
 placesRouter.post('/geocode', async (req, res) => {
-  const { name, location, country } = (req.body ?? {}) as Record<string, unknown>;
+  const { name, location, country, hasPhotoGps } = (req.body ?? {}) as Record<string, unknown>;
   if (typeof name !== 'string' || !name.trim() || name.trim().length > 80) {
     res.status(400).json({ error: 'INVALID_NAME' });
     return;
@@ -124,26 +124,42 @@ placesRouter.post('/geocode', async (req, res) => {
   }
 
   const normalizedCountry = normalizeSearchText(country);
-  const normalizedHints = [location, name]
-    .map((value) => normalizeSearchText(value))
-    .filter(Boolean);
+  const normalizedName = normalizeSearchText(name);
+  const normalizedLocation = normalizeSearchText(location);
   const curated = db
     .prepare('SELECT * FROM places WHERE is_curated = 1')
     .all() as PlaceRow[];
-  const catalogMatch = curated.find((place) => {
-    if (normalizeSearchText(place.country) !== normalizedCountry) return false;
-    const placeName = normalizeSearchText(place.name);
-    return normalizedHints.some(
-      (hint) => hint === placeName || (placeName.length >= 4 && hint.includes(placeName)),
-    );
-  });
+  const findCatalogMatch = (hint: string) =>
+    curated.find((place) => {
+      if (!hint || normalizeSearchText(place.country) !== normalizedCountry) return false;
+      return [place.name, place.state]
+        .filter((value): value is string => typeof value === 'string')
+        .map((value) => normalizeSearchText(value))
+        .some(
+          (searchable) =>
+            hint === searchable || (searchable.length >= 4 && hint.includes(searchable)),
+        );
+    });
+  const catalogNameMatch = findCatalogMatch(normalizedName);
+  // With photo GPS, a city/region catalog point is enough to confirm the
+  // surrounding area. Without it, resolve the complete query so a named venue
+  // is not silently stored at the city center.
+  const catalogMatch =
+    catalogNameMatch ?? (hasPhotoGps === true ? findCatalogMatch(normalizedLocation) : undefined);
   if (catalogMatch) {
+    // A city or state used only as the location hint confirms where a custom
+    // point is, but does not turn a cafe, trailhead, or other venue into that
+    // broader category. The custom name itself must identify the city/state.
+    const category = catalogNameMatch?.category ?? 'landmark';
     res.json({
       location: {
         lat: catalogMatch.lat,
         lng: catalogMatch.lng,
         label: `${catalogMatch.name}, ${catalogMatch.country}`,
         source: 'catalog',
+        category,
+        stateName: category === 'us-state' ? catalogMatch.state : null,
+        bounds: null,
       },
     });
     return;
@@ -165,7 +181,7 @@ placesRouter.post('/geocode', async (req, res) => {
 
 placesRouter.post('/', (req, res) => {
   const user = currentUser(res);
-  const { name, country, description, lat, lng } = (req.body ?? {}) as Record<
+  const { name, country, description, lat, lng, category, state } = (req.body ?? {}) as Record<
     string,
     unknown
   >;
@@ -185,13 +201,28 @@ placesRouter.post('/', (req, res) => {
     res.status(400).json({ error: 'INVALID_COORDINATES' });
     return;
   }
+  const placeCategory = category === undefined ? 'landmark' : category;
+  if (
+    placeCategory !== 'landmark' &&
+    placeCategory !== 'city' &&
+    placeCategory !== 'us-state'
+  ) {
+    res.status(400).json({ error: 'INVALID_CATEGORY' });
+    return;
+  }
   const desc = typeof description === 'string' ? description.trim().slice(0, 400) : '';
+  const stateName =
+    placeCategory === 'us-state'
+      ? typeof state === 'string' && state.trim()
+        ? state.trim().slice(0, 60)
+        : name.trim().slice(0, 60)
+      : null;
   const id = randomUUID();
   db.prepare(
     `INSERT INTO places
-       (id, name, country, description, lat, lng, is_curated, created_by, state)
-     VALUES (?, ?, ?, ?, ?, ?, 0, ?, NULL)`,
-  ).run(id, name.trim(), country.trim(), desc, lat, lng, user.id);
+       (id, name, country, description, lat, lng, is_curated, created_by, category, state)
+     VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+  ).run(id, name.trim(), country.trim(), desc, lat, lng, user.id, placeCategory, stateName);
   const place = db.prepare('SELECT * FROM places WHERE id = ?').get(id) as PlaceRow;
   res.status(201).json({ place: serializePlace(place, null) });
 });

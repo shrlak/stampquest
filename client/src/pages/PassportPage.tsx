@@ -40,8 +40,8 @@ const CATEGORY_CARDS: {
   {
     category: 'us-state',
     to: '/us-states',
-    title: 'US States',
-    blurb: 'Fifty states. Fifty unforgettable places to make yours.',
+    title: 'States',
+    blurb: 'State-sized chapters, from coastlines to mountain summits.',
     chapter: 'Chapter 03',
     gradient: 'from-[#d9f4e2] via-[#ecf9f0] to-[#f8fdf9]',
     accent: 'bg-[#248d4d]',

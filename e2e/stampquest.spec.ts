@@ -129,31 +129,71 @@ test('register, collect at the Eiffel Tower, add a custom place', async ({ page 
   await expect(page.getByTestId('state-name')).toHaveText('Alabama');
   await page.getByTestId('back-button').click();
 
-  // Custom-place location can come from photo EXIF or a typed lookup. The
-  // typed match intentionally overrides the photo before the place is saved.
+  // Category inference uses the typed identity of the custom place, while
+  // catalog-backed confirmation keeps this deterministic and off the network.
+  const classifications = await page.evaluate(async () => {
+    const resolve = async (name: string, location: string, country: string) => {
+      const response = await fetch('/api/places/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, location, country }),
+      });
+      return response.json();
+    };
+    return {
+      landmark: await resolve('Eiffel Tower View', 'Paris', 'France'),
+      city: await resolve('Paris Memory', 'Paris', 'France'),
+      state: await resolve('Texas Journey', 'Texas', 'United States'),
+    };
+  });
+  expect(classifications.landmark.location.category).toBe('landmark');
+  expect(classifications.city.location.category).toBe('city');
+  expect(classifications.state.location.category).toBe('us-state');
+  expect(classifications.state.location.stateName).toBe('Texas');
+
+  // Custom-place creation has one automatic flow: photo EXIF is the primary
+  // coordinate source, and the typed place must confirm that GPS. There are
+  // no source selectors or manual coordinate fields.
   await page.getByTestId('add-fab').click();
   await expect(page.getByTestId('add-place-modal')).toBeVisible();
-  await page.getByTestId('place-name').fill('Café de Flore');
-  await page.getByTestId('place-location-hint').fill('Eiffel Tower');
-  await page.getByTestId('place-country').fill('France');
+  await expect(page.getByTestId('automatic-location')).toBeVisible();
+  await expect(page.getByText('Photo GPS is used first')).toBeVisible();
+  await expect(page.getByTestId('lookup-location')).toHaveCount(0);
+  await expect(page.getByTestId('manual-lat')).toHaveCount(0);
+  await page.getByTestId('place-name').fill('Paris Memory');
+  await page.getByTestId('place-location-hint').fill('New York City');
+  await page.getByTestId('place-country').fill('United States');
   await page.getByTestId('place-photo-input').setInputFiles({
     name: 'paris-gps.jpg',
     mimeType: 'image/jpeg',
     buffer: Buffer.from(TEST_GPS_JPEG_BASE64, 'base64'),
   });
-  await expect(page.getByTestId('photo-location-status')).toContainText('Photo GPS found');
-  await expect(page.getByTestId('location-resolution')).toContainText('Photo location found');
-  await page.getByTestId('lookup-location').click();
-  await expect(page.getByTestId('location-resolution')).toContainText('Matched in StampQuest');
-  await expect(page.getByTestId('location-resolution')).toContainText('Eiffel Tower, France');
+  await expect(page.getByTestId('photo-location-status')).toContainText('GPS found');
+
+  // A mismatched typed location is rejected instead of silently replacing the
+  // photo coordinates.
+  await page.getByTestId('save-place').click();
+  await expect(page.getByTestId('add-place-error')).toContainText('does not match');
+  await page.getByTestId('place-location-hint').fill('Paris');
+  await page.getByTestId('place-country').fill('France');
   await page.getByTestId('save-place').click();
   await expect(page.getByTestId('add-place-modal')).toHaveCount(0);
   await page.getByTestId('collect-button').click();
-  await expect(page.getByTestId('collected-line')).toContainText('Café de Flore');
+  await expect(page.getByTestId('collected-line')).toContainText('Paris Memory');
 
   // stats: 2 stamps, 1 country (both France)
   await page.getByTestId('topbar-home').click();
   await expect(page.getByTestId('stats-strip')).toContainText(`2 / ${CURATED_COUNT + 1}`);
+
+  // The inferred city category places the custom stamp in Cities, without the
+  // traveler selecting a category themselves.
+  await page.getByTestId('home-card-city').click();
+  await page.getByTestId('city-search').fill('Paris Memory');
+  await expect(
+    page.locator('[data-testid="city-cards"] [data-testid="stamp-card"]'),
+  ).toHaveCount(1);
+  await expect(page.getByText('Paris Memory')).toBeVisible();
+  await page.getByTestId('back-button').click();
 
   // profile: reached via the top-right avatar; collected-stamps gallery, units toggle,
   // "My places" list, and a profile-photo upload
@@ -297,5 +337,5 @@ test('custom places are private to their creator', async ({ request }) => {
     places: { name: string }[];
   };
   expect(places).toHaveLength(CURATED_COUNT);
-  expect(places.some((p) => p.name === 'Café de Flore')).toBe(false);
+  expect(places.some((p) => p.name === 'Paris Memory')).toBe(false);
 });

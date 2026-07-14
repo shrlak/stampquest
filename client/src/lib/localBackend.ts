@@ -4,12 +4,19 @@
 import { COLLECT_RADIUS_M, PHOTO_RADIUS_M, haversineMeters } from './geo';
 import { idbDelete, idbGet, idbKeys, idbSet } from './idb';
 import { SEED_PLACES } from '../data/seedPlaces';
-import type { GeocodedLocation, Place, Stamp, Stats, User } from '../types';
+import type {
+  GeocodedLocation,
+  Place,
+  PlaceCategory,
+  Stamp,
+  Stats,
+  User,
+} from '../types';
 
 const GLOBAL_KEYS = {
   accounts: 'stampquest.local.accounts.v2',
   session: 'stampquest.local.session.v2',
-  geocodeCache: 'stampquest.local.geocode-cache.v1',
+  geocodeCache: 'stampquest.local.geocode-cache.v2',
   geocodeLastRequest: 'stampquest.local.geocode-last-request.v1',
 };
 
@@ -31,6 +38,8 @@ interface CustomPlace {
   description: string;
   lat: number;
   lng: number;
+  category?: PlaceCategory;
+  state?: string | null;
   createdAt: string;
 }
 
@@ -43,6 +52,11 @@ interface NominatimResult {
   lat?: unknown;
   lon?: unknown;
   display_name?: unknown;
+  name?: unknown;
+  addresstype?: unknown;
+  type?: unknown;
+  boundingbox?: unknown;
+  address?: unknown;
 }
 
 function load<T>(key: string, fallback: T): T {
@@ -62,6 +76,31 @@ const normalizeSearchText = (value: string) =>
   value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('en');
 
 let geocodeQueue: Promise<void> = Promise.resolve();
+
+function inferCategory(result: NominatimResult): PlaceCategory {
+  const addressType = typeof result.addresstype === 'string' ? result.addresstype : '';
+  const type = typeof result.type === 'string' ? result.type : '';
+  const classification = `${addressType} ${type}`.toLocaleLowerCase('en');
+  if (/\b(state|province|region)\b/.test(classification)) return 'us-state';
+  if (/\b(city|town|village|municipality|borough)\b/.test(classification)) return 'city';
+  return 'landmark';
+}
+
+function parseBounds(value: unknown): GeocodedLocation['bounds'] {
+  if (!Array.isArray(value) || value.length !== 4) return null;
+  const [south, north, west, east] = value.map(Number);
+  if (
+    ![south, north, west, east].every(Number.isFinite) ||
+    south < -90 ||
+    south > north ||
+    north > 90 ||
+    west < -180 ||
+    east > 180
+  ) {
+    return null;
+  }
+  return { south, north, west, east };
+}
 
 async function geocodeWithNominatim(query: string): Promise<GeocodedLocation | null> {
   const key = normalizeSearchText(query);
@@ -95,7 +134,7 @@ async function geocodeWithNominatim(query: string): Promise<GeocodedLocation | n
     endpoint.searchParams.set('q', query);
     endpoint.searchParams.set('format', 'jsonv2');
     endpoint.searchParams.set('limit', '1');
-    endpoint.searchParams.set('addressdetails', '0');
+    endpoint.searchParams.set('addressdetails', '1');
     const response = await fetch(endpoint, {
       headers: { Accept: 'application/json', 'Accept-Language': 'en' },
     });
@@ -105,6 +144,11 @@ async function geocodeWithNominatim(query: string): Promise<GeocodedLocation | n
     const first = Array.isArray(body) ? (body[0] as NominatimResult | undefined) : undefined;
     const lat = Number(first?.lat);
     const lng = Number(first?.lon);
+    const category = first ? inferCategory(first) : 'landmark';
+    const address =
+      first?.address && typeof first.address === 'object'
+        ? (first.address as Record<string, unknown>)
+        : {};
     const match =
       first &&
       Number.isFinite(lat) &&
@@ -119,6 +163,16 @@ async function geocodeWithNominatim(query: string): Promise<GeocodedLocation | n
                 ? first.display_name.trim()
                 : query,
             source: 'openstreetmap' as const,
+            category,
+            stateName:
+              category === 'us-state'
+                ? typeof address.state === 'string'
+                  ? address.state
+                  : typeof first.name === 'string'
+                    ? first.name
+                    : null
+                : null,
+            bounds: parseBounds(first.boundingbox),
           }
         : null;
     const entries = Object.entries({ ...refreshed, [key]: match });
@@ -203,6 +257,7 @@ function toPlace(
   stampMap: Record<string, Stamp>,
 ): Place {
   const seed = curated ? (seedOrCustom as (typeof SEED_PLACES)[number]) : null;
+  const custom = curated ? null : (seedOrCustom as CustomPlace);
   return {
     id: seedOrCustom.id,
     name: seedOrCustom.name,
@@ -213,8 +268,8 @@ function toPlace(
     isCurated: curated,
     isMine: !curated,
     artKey: seed?.artKey ?? null,
-    category: seed?.category ?? 'landmark',
-    state: seed?.state ?? null,
+    category: seed?.category ?? custom?.category ?? 'landmark',
+    state: seed?.state ?? custom?.state ?? null,
     createdAt: curated ? '' : (seedOrCustom as CustomPlace).createdAt,
     stamp: stampMap[seedOrCustom.id] ?? null,
   };
@@ -345,7 +400,7 @@ export async function localRequest(
   }
 
   if (path === '/api/places/geocode' && method === 'POST') {
-    const { name, location, country } = b;
+    const { name, location, country, hasPhotoGps } = b;
     if (typeof name !== 'string' || !name.trim() || name.trim().length > 80) {
       return fail(400, 'INVALID_NAME');
     }
@@ -360,23 +415,36 @@ export async function localRequest(
     }
 
     const normalizedCountry = normalizeSearchText(country);
-    const normalizedHints = [location, name]
-      .map((value) => normalizeSearchText(value))
-      .filter(Boolean);
-    const catalogMatch = SEED_PLACES.find((place) => {
-      if (normalizeSearchText(place.country) !== normalizedCountry) return false;
-      const placeName = normalizeSearchText(place.name);
-      return normalizedHints.some(
-        (hint) => hint === placeName || (placeName.length >= 4 && hint.includes(placeName)),
-      );
-    });
+    const normalizedName = normalizeSearchText(name);
+    const normalizedLocation = normalizeSearchText(location);
+    const findCatalogMatch = (hint: string) =>
+      SEED_PLACES.find((place) => {
+        if (!hint || normalizeSearchText(place.country) !== normalizedCountry) return false;
+        return [place.name, place.state]
+          .filter((value): value is string => typeof value === 'string')
+          .map((value) => normalizeSearchText(value))
+          .some(
+            (searchable) =>
+              hint === searchable || (searchable.length >= 4 && hint.includes(searchable)),
+          );
+      });
+    const catalogNameMatch = findCatalogMatch(normalizedName);
+    // A location-only catalog match is useful for confirming photo GPS. When
+    // there is no photo location, let the full query resolve the actual point
+    // instead of silently dropping a cafe or address at the city center.
+    const catalogMatch =
+      catalogNameMatch ?? (hasPhotoGps === true ? findCatalogMatch(normalizedLocation) : undefined);
     if (catalogMatch) {
+      const category = catalogNameMatch?.category ?? 'landmark';
       return ok({
         location: {
           lat: catalogMatch.lat,
           lng: catalogMatch.lng,
           label: `${catalogMatch.name}, ${catalogMatch.country}`,
           source: 'catalog',
+          category,
+          stateName: category === 'us-state' ? catalogMatch.state : null,
+          bounds: null,
         } satisfies GeocodedLocation,
       });
     }
@@ -395,7 +463,7 @@ export async function localRequest(
   }
 
   if (path === '/api/places' && method === 'POST') {
-    const { name, country, description, lat, lng } = b;
+    const { name, country, description, lat, lng, category, state } = b;
     if (typeof name !== 'string' || !name.trim()) return fail(400, 'INVALID_NAME');
     if (typeof country !== 'string' || !country.trim()) return fail(400, 'INVALID_COUNTRY');
     if (
@@ -408,6 +476,14 @@ export async function localRequest(
     ) {
       return fail(400, 'INVALID_COORDINATES');
     }
+    const placeCategory = category === undefined ? 'landmark' : category;
+    if (
+      placeCategory !== 'landmark' &&
+      placeCategory !== 'city' &&
+      placeCategory !== 'us-state'
+    ) {
+      return fail(400, 'INVALID_CATEGORY');
+    }
     const place: CustomPlace = {
       id: crypto.randomUUID(),
       name: name.trim().slice(0, 80),
@@ -415,6 +491,13 @@ export async function localRequest(
       description: typeof description === 'string' ? description.trim().slice(0, 400) : '',
       lat,
       lng,
+      category: placeCategory,
+      state:
+        placeCategory === 'us-state'
+          ? typeof state === 'string' && state.trim()
+            ? state.trim().slice(0, 60)
+            : name.trim().slice(0, 60)
+          : null,
       createdAt: new Date().toISOString(),
     };
     store(placesKey(account.id), [...customPlaces(account.id), place]);

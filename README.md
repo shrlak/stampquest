@@ -13,12 +13,12 @@ A mobile-first web app where you collect digital stamps from places you visit an
 - **Illustrated, locked stamps** — every place immediately shows its own colorful travel-poster artwork beneath a translucent glass lock, so the passport stays visual before anything has been collected.
 - **Your photo is the stamp** — the first photo you add for a place — from collecting in person or via photo evidence — replaces the built-in illustration and removes its lock, inside the same vintage postage-stamp frame.
 - **329 curated places** — 203 landmarks, 76 cities, and one iconic stop in each of the 50 U.S. states — spanning Asia, Europe, the Americas, Africa, and Oceania. Each has deterministic illustrated artwork until you fill it with your own photo.
-- **Custom places with smart location** — add your own café, trailhead, or rooftop from the floating **+** button. Coordinates can come from a photo's embedded GPS, a user-triggered place/address lookup, saved live GPS, or a manual correction. Each place gets a generated stamp and stays private to your account.
+- **Automatic custom-place location** — add your own café, trailhead, city, or state from the floating **+** button. The app uses photo EXIF GPS first, always confirms it against the typed place, falls back to typed coordinates only when the photo has no GPS, and automatically files the result under Landmarks, Cities, or States. There is no coordinate-source or category selector.
 - **Simple accounts** — sign up with just a username and password. Your stamps, custom places, and photos are private to your account; no third-party sign-in required. The static Pages build provides the same account gate locally with PBKDF2-hashed passwords and per-account device storage.
 - **Profile photo** — tap your avatar in the top-right corner or on the profile tab to add or replace your profile picture.
-- **Immersive home landing page** — an editorial travel hero, animated route, live collection progress, and three visual passport chapters — Landmarks, Cities, US States — each opening into its own browsing page.
+- **Immersive home landing page** — an editorial travel hero, animated route, live collection progress, and three visual passport chapters — Landmarks, Cities, States — each opening into its own browsing page.
 - **Refresh returns home** — a full browser refresh always reopens the main passport landing page; normal in-app navigation still preserves the selected place or category.
-- **Browse by Landmarks, Cities, or US States** — each category page offers a **card or map view** (the map is a real pannable/zoomable Leaflet map with OpenStreetMap tiles, lazy-loaded so it never costs anyone who stays on card view), plus its own search.
+- **Browse by Landmarks, Cities, or States** — each category page offers a **card or map view** (the map is a real pannable/zoomable Leaflet map with OpenStreetMap tiles, lazy-loaded so it never costs anyone who stays on card view), plus its own search.
 - **Metric or imperial** — a units toggle on your profile switches every distance in the app (collect radius, "how far away," photo-match radius) between the two, remembered per device.
 - **Personal passport** — your home page's stats strip tracks stamps, countries, and continents traveled; your profile shows a 3-column gallery of everything you've collected plus the custom places you've added.
 - **Globe-trotting intro** — a one-time animated splash (spinning globe, orbiting plane, landmarks lighting up across every continent) plays when you enter the app, then fades into your passport underneath.
@@ -71,7 +71,7 @@ One process serves everything: the built client, the SPA fallback, and the `/api
 
 Every push to the default branch runs `.github/workflows/deploy-pages.yml`, which publishes a static build to **https://shrlak.github.io/passport/**.
 
-GitHub Pages can't run the Node API, so this build swaps in a browser backend (`VITE_BACKEND=local`). It has a real local sign-up/sign-in gate: passwords are salted and PBKDF2-hashed with Web Crypto, and each account gets isolated stamps, custom places, profile photo, and stamp photos. Data remains on that browser/device, so there is no cross-device sync. The 500 m and photo-radius checks run client-side, and photo evidence uses EXIF GPS only because Gemini/Hugging Face verification requires the Node server. User-triggered custom-place searches call the configured geocoder directly, with a browser cache and one-request-per-second throttle. Since Pages serves over HTTPS, GPS collection and PWA installation work on phones.
+GitHub Pages can't run the Node API, so this build swaps in a browser backend (`VITE_BACKEND=local`). It has a real local sign-up/sign-in gate: passwords are salted and PBKDF2-hashed with Web Crypto, and each account gets isolated stamps, custom places, profile photo, and stamp photos. Data remains on that browser/device, so there is no cross-device sync. The 500 m and photo-radius checks run client-side, and photo evidence uses EXIF GPS only because Gemini/Hugging Face verification requires the Node server. Automatic custom-place confirmation calls the configured geocoder directly when the catalog cannot resolve the typed place, with a browser cache and one-request-per-second throttle. Since Pages serves over HTTPS, GPS collection and PWA installation work on phones.
 
 The workflow publishes the build to a `gh-pages` branch, which GitHub picks up automatically. If the site doesn't appear after the first successful run, enable it once by hand — repo **Settings → Pages → Deploy from a branch → `gh-pages` / root** — later deploys are automatic.
 
@@ -88,14 +88,14 @@ The radius lives in `server/src/geo.ts` (authoritative) and is mirrored in `clie
 
 ## Locating a custom place
 
-The **Create your own** sheet resolves coordinates in four ways:
+The **Create your own** sheet has one automatic resolution path:
 
-1. **Photo GPS** — `exifr` reads embedded EXIF coordinates locally; the selected image is not uploaded by this step.
-2. **Typed lookup** — the place name, city/region/address, and country are matched against the StampQuest catalog first, then sent through a one-result OpenStreetMap Nominatim lookup when needed. Results are approximate and remain editable through manual coordinates.
-3. **Saved GPS** — use the live coordinates retained for the current signed-in session.
-4. **Manual coordinates** — enter an exact latitude and longitude.
+1. If a photo is selected, `exifr` reads its embedded GPS locally. The image itself is not uploaded during this location step.
+2. On **Create stamp**, the typed name, city/region/address, and country are resolved against the StampQuest catalog first, then through one OpenStreetMap Nominatim result when needed.
+3. Typed coordinates must agree with the photo GPS. A mismatch is rejected with a correction prompt; a match preserves the more precise photo coordinates. If the photo has no GPS, typed coordinates become the fallback.
+4. The resolved place type automatically assigns `landmark`, `city`, or `us-state`, which controls where the personal stamp appears. A city or state used only as an address hint does not reclassify a named venue.
 
-Typed lookup happens only when the traveler taps **Find typed place** or submits without another location source—never as autocomplete or a background request. Server and static modes cache results and serialize public Nominatim requests to at most one per second, with visible [OpenStreetMap attribution](https://www.openstreetmap.org/copyright). Deployments expecting meaningful lookup traffic should point `GEOCODER_URL` (and `VITE_GEOCODER_URL` for a static build) at a geocoder they operate or contract for.
+There is no coordinate-source, manual-coordinate, saved-GPS, or category selector. Resolution runs only on submit, never as autocomplete or a background request. Server and static modes cache results and serialize public Nominatim requests to at most one per second, with visible [OpenStreetMap attribution](https://www.openstreetmap.org/copyright). Deployments expecting meaningful lookup traffic should point `GEOCODER_URL` (and `VITE_GEOCODER_URL` for a static build) at a geocoder they operate or contract for.
 
 ### Collecting remotely, with a photo
 
@@ -108,11 +108,11 @@ Either way, the uploaded photo becomes the stamp's artwork — same as collectin
 
 ## Navigation
 
-Signed-in visitors land on the home page: a stats strip, then three cards — **Landmarks**, **Cities**, **US States**. Tapping a card opens that category's own page (with a back chevron to return home); it isn't reachable any other way. Two things stay on screen everywhere in the app: your profile avatar, top-right, and a circular **+** button, bottom-center, which pops up the add-a-place form without leaving the page you're on.
+Signed-in visitors land on the home page: a stats strip, then three cards — **Landmarks**, **Cities**, **States**. Tapping a card opens that category's own page (with a back chevron to return home); it isn't reachable any other way. Two things stay on screen everywhere in the app: your profile avatar, top-right, and a circular **+** button, bottom-center, which pops up the add-a-place form without leaving the page you're on.
 
 ## Browsing by category
 
-The curated roster is tagged with a `category` — `landmark`, `city`, or `us-state`. Custom places you add default to `landmark`. Each category page offers:
+The curated roster is tagged with a `category` — `landmark`, `city`, or `us-state`. Personal places receive the same category automatically from their confirmed typed result, with `landmark` retained as the compatibility fallback for older locally stored entries. Each category page offers:
 
 - **Card view** — the same 2-column stamp grid as your passport, with every built-in illustration kept visible beneath a translucent lock until a personal photo replaces it. Places are sorted by distance once you've granted location, alphabetical otherwise.
 - **Map view** — a real Leaflet map with OpenStreetMap tiles and a pin per place; tap a pin to jump to that place's detail page. The map library is dynamically imported, so it only downloads if you actually open map view.
@@ -125,7 +125,7 @@ A Metric/Imperial toggle on the profile page (persisted in `localStorage`) contr
 
 - `users` — username (unique, 3–24 chars), scrypt password hash, plus an optional profile `photo` BLOB (`photo_mime`, `photo_updated_at`), served via `GET /api/auth/me/photo`
 - `sessions` — random 32-byte tokens, 30-day expiry, httpOnly cookie
-- `places` — curated seed (`is_curated=1`, `art_key` → client art registry) or user-created (`created_by`, private to creator), tagged with a `category` and a nullable full `state` name for the 50 U.S.-state entries
+- `places` — curated seed (`is_curated=1`, `art_key` → client art registry) or user-created (`created_by`, private to creator), tagged with a `category` and a nullable full `state` name for both the 50 seeded state entries and automatically classified personal state places
 - `stamps` — `UNIQUE(user_id, place_id)`, collection time + coordinates + distance, plus an optional `photo` BLOB (`photo_mime`, `photo_updated_at`) — the user's own photo of the place, served via `GET /api/places/:id/photo`
 
 The schema is applied idempotently on boot, including additive migrations for `category`, `state`, and photo fields. Curated records are synchronized by name and country on every boot, so an existing database receives newly added cities and state labels without replacing user-created places or collected stamps. The current roster is 329 places: 203 landmarks, 76 cities, and 50 state entries.
@@ -137,7 +137,7 @@ npx playwright install chromium   # once
 npm run e2e
 ```
 
-The suite builds the client, boots the server on a throwaway database (with `GOOGLE_API_KEY`/`HUGGINGFACE_API_KEY` unset, so the landmark-recognition path is deterministically off), and drives the real app at 390×844 with mocked geolocation: unauthenticated route gate → registration → one-time location onboarding and red/yellow/green status states → home landing page (329-place stats and category cards) → the Landmarks card's card and map views → in-range detection at the Eiffel Tower → collect → verify its built-in illustration and translucent lock → add a photo, which replaces both → location and collection persistence across reload → the 76-city and 50-state collections (including state-name labels) → custom place creation from both photo EXIF and typed catalog lookup → the profile's collected-stamps gallery, units toggle, profile-photo upload, location cleanup, and sign-out → **server-side rejection of far-away coordinates** → **remote collection via matching photo EXIF GPS**, plus rejection of a too-far or location-less photo → account privacy checks.
+The suite builds the client, boots the server on a throwaway database (with `GOOGLE_API_KEY`/`HUGGINGFACE_API_KEY` unset, so the landmark-recognition path is deterministically off), and drives the real app at 390×844 with mocked geolocation: unauthenticated route gate → registration → one-time location onboarding and red/yellow/green status states → home landing page (329-place stats and category cards) → the Landmarks card's card and map views → in-range detection at the Eiffel Tower → collect → verify its built-in illustration and translucent lock → add a photo, which replaces both → location and collection persistence across reload → the 76-city and 50-state collections (including state-name labels) → automatic custom-place confirmation, photo/typed mismatch rejection, and Landmarks/Cities/States classification → the profile's collected-stamps gallery, units toggle, profile-photo upload, location cleanup, and sign-out → **server-side rejection of far-away coordinates** → **remote collection via matching photo EXIF GPS**, plus rejection of a too-far or location-less photo → account privacy checks.
 
 ## Stamp art
 
