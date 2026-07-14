@@ -21,6 +21,7 @@ interface AuthContextValue {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
+  signInWithGoogle: (credential: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshMe: () => Promise<void>;
 }
@@ -63,6 +64,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password,
           displayName,
         });
+        setUser(me.user);
+        setStats(me.stats);
+      },
+      signInWithGoogle: async (credential) => {
+        const me = await api.post<MeResponse>('/api/auth/google', { credential });
         setUser(me.user);
         setStats(me.stats);
       },

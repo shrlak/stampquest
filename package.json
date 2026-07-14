@@ -15,7 +15,7 @@
     "typecheck": "npm run typecheck -w client && npm run typecheck -w server",
     "gen-icons": "node scripts/gen-icons.mjs",
     "e2e": "playwright test -c e2e",
-    "e2e:server": "npm run build -w client && rm -rf e2e/.tmp && mkdir -p e2e/.tmp && DATABASE_PATH=e2e/.tmp/e2e.db PORT=4173 ANTHROPIC_API_KEY= npx tsx server/src/index.ts"
+    "e2e:server": "npm run build -w client && rm -rf e2e/.tmp && mkdir -p e2e/.tmp && DATABASE_PATH=e2e/.tmp/e2e.db PORT=4173 GOOGLE_API_KEY= HUGGINGFACE_API_KEY= npx tsx server/src/index.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

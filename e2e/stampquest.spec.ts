@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url';
 const NYC = { latitude: 40.7128, longitude: -74.006 };
 const shot = (name: string) => fileURLToPath(new URL(`screenshots/${name}.png`, import.meta.url));
 
+// Keep in sync with the curated roster in server/src/seed.ts.
+const CURATED_COUNT = 133;
+
 // One account shared across the serial suite.
 const email = `e2e-${Date.now()}@example.com`;
 const password = 'wanderlust1';
@@ -25,11 +28,11 @@ test('register, collect at the Eiffel Tower, add a custom place', async ({ page 
   await page.getByPlaceholder('Password (8+ characters)').fill(password);
   await page.getByTestId('auth-submit').click();
 
-  // passport: 24 curated stamps, all locked
+  // passport: curated stamps, all locked
   await expect(page.getByTestId('passport-grid')).toBeVisible();
-  await expect(page.getByTestId('stamp-card')).toHaveCount(24);
+  await expect(page.getByTestId('stamp-card')).toHaveCount(CURATED_COUNT);
   await expect(page.locator('[data-testid="stamp-card"][data-collected="true"]')).toHaveCount(0);
-  await expect(page.getByTestId('stats-strip')).toContainText('0 / 24');
+  await expect(page.getByTestId('stats-strip')).toContainText(`0 / ${CURATED_COUNT}`);
   await page.screenshot({ path: shot('02-passport-locked'), fullPage: true });
 
   // explore: location sorts Eiffel Tower first and in range
@@ -69,7 +72,7 @@ test('register, collect at the Eiffel Tower, add a custom place', async ({ page 
   // passport reflects the collection
   await page.getByRole('link', { name: 'Passport' }).click();
   await expect(page.locator('[data-testid="stamp-card"][data-collected="true"]')).toHaveCount(1);
-  await expect(page.getByTestId('stats-strip')).toContainText('1 / 24');
+  await expect(page.getByTestId('stats-strip')).toContainText(`1 / ${CURATED_COUNT}`);
   await page.screenshot({ path: shot('05-passport-collected'), fullPage: true });
 
   // custom place at current location, then collect it
@@ -85,7 +88,7 @@ test('register, collect at the Eiffel Tower, add a custom place', async ({ page 
   // stats: 2 stamps, 1 country (both France); custom grid appears
   await page.getByRole('link', { name: 'Passport' }).click();
   await expect(page.getByTestId('my-places-grid')).toBeVisible();
-  await expect(page.getByTestId('stats-strip')).toContainText('2 / 25');
+  await expect(page.getByTestId('stats-strip')).toContainText(`2 / ${CURATED_COUNT + 1}`);
   await page.getByRole('link', { name: 'Profile' }).click();
   await expect(page.getByText('stamps')).toBeVisible();
   await page.screenshot({ path: shot('06-profile') });
@@ -189,6 +192,6 @@ test('custom places are private to their creator', async ({ request }) => {
   const { places } = (await (await request.get('/api/places')).json()) as {
     places: { name: string }[];
   };
-  expect(places).toHaveLength(24);
+  expect(places).toHaveLength(CURATED_COUNT);
   expect(places.some((p) => p.name === 'Café de Flore')).toBe(false);
 });

@@ -1,19 +1,27 @@
-import { useState, type FormEvent } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/Button';
 import { StampSVG } from '../art/StampSVG';
-import { ApiError } from '../lib/api';
+import { ApiError, IS_LOCAL_BACKEND } from '../lib/api';
+import { GoogleSignInButton } from '../components/GoogleSignInButton';
 
 const ERROR_COPY: Record<string, string> = {
   INVALID_CREDENTIALS: 'Wrong email or password.',
   EMAIL_TAKEN: 'An account with this email already exists — try signing in.',
   INVALID_EMAIL: 'That doesn’t look like a valid email address.',
   WEAK_PASSWORD: 'Password must be at least 8 characters.',
+  INVALID_GOOGLE_TOKEN: 'Google sign-in didn’t go through — try again.',
+  GOOGLE_EMAIL_UNVERIFIED: 'That Google account’s email isn’t verified.',
+  GOOGLE_LOGIN_UNAVAILABLE: 'Google sign-in isn’t configured on this server.',
 };
 
+// Baked in at build time; unset in the static GitHub Pages demo, which has
+// no real per-account backend for Google to sign into.
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+
 export default function AuthPage() {
-  const { user, loading, signIn, signUp } = useAuth();
+  const { user, loading, signIn, signUp, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
@@ -23,6 +31,24 @@ export default function AuthPage() {
   const [busy, setBusy] = useState(false);
 
   if (!loading && user) return <Navigate to="/" replace />;
+
+  const handleGoogleCredential = useCallback(
+    (credential: string) => {
+      setBusy(true);
+      setError(null);
+      signInWithGoogle(credential)
+        .then(() => navigate('/', { replace: true }))
+        .catch((err) => {
+          setError(
+            err instanceof ApiError
+              ? (ERROR_COPY[err.code] ?? 'Something went wrong. Try again.')
+              : 'Could not reach the server. Are you online?',
+          );
+        })
+        .finally(() => setBusy(false));
+    },
+    [signInWithGoogle, navigate],
+  );
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -96,6 +122,19 @@ export default function AuthPage() {
           {busy ? 'One moment…' : mode === 'signin' ? 'Sign in' : 'Create account'}
         </Button>
       </form>
+
+      {GOOGLE_CLIENT_ID && !IS_LOCAL_BACKEND && (
+        <>
+          <div className="mt-5 flex items-center gap-3 text-xs text-ink-soft">
+            <div className="h-px flex-1 bg-ink/10" />
+            <span>or</span>
+            <div className="h-px flex-1 bg-ink/10" />
+          </div>
+          <div className="mt-4">
+            <GoogleSignInButton clientId={GOOGLE_CLIENT_ID} onCredential={handleGoogleCredential} />
+          </div>
+        </>
+      )}
 
       <button
         type="button"

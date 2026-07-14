@@ -34,6 +34,17 @@ if (!stampCols.includes('photo')) {
     ALTER TABLE stamps ADD COLUMN photo_updated_at TEXT;`);
 }
 
+// Additive migration for databases created before Google sign-in existed.
+// SQLite can't add a UNIQUE column via ALTER TABLE, so add it plain and
+// enforce uniqueness with a separate index (equivalent for query purposes).
+const userCols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(
+  (c) => c.name,
+);
+if (!userCols.includes('google_id')) {
+  db.exec(`ALTER TABLE users ADD COLUMN google_id TEXT;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);`);
+}
+
 const placeCount = db
   .prepare('SELECT count(*) AS n FROM places WHERE is_curated = 1')
   .get() as { n: number };
@@ -55,7 +66,8 @@ if (placeCount.n === 0) {
 export interface UserRow {
   id: number;
   email: string;
-  password_hash: string;
+  password_hash: string | null;
+  google_id: string | null;
   display_name: string;
   created_at: string;
 }
