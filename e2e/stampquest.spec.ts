@@ -27,30 +27,34 @@ test('register, collect at the Eiffel Tower, add a custom place', async ({ page 
   await page.getByTestId('auth-password').fill(password);
   await page.getByTestId('auth-submit').click();
 
-  // passport: curated stamps, all locked
-  await expect(page.getByTestId('passport-grid')).toBeVisible();
-  await expect(page.getByTestId('stamp-card')).toHaveCount(CURATED_COUNT);
-  await expect(page.locator('[data-testid="stamp-card"][data-collected="true"]')).toHaveCount(0);
+  // home landing page: stats strip + three category cards
+  await expect(page.getByTestId('stats-strip')).toBeVisible();
   await expect(page.getByTestId('stats-strip')).toContainText(`0 / ${CURATED_COUNT}`);
-  await page.screenshot({ path: shot('02-passport-locked'), fullPage: true });
+  await expect(page.getByTestId('home-card-landmark')).toBeVisible();
+  await expect(page.getByTestId('home-card-city')).toBeVisible();
+  await expect(page.getByTestId('home-card-us-state')).toBeVisible();
+  await page.screenshot({ path: shot('02-home'), fullPage: true });
 
-  // landmarks tab: location sorts Eiffel Tower first and in range
-  await page.locator('nav').getByRole('link', { name: 'Landmarks' }).click();
-  await page.getByTestId('enable-location').click();
-  const firstRow = page.locator('[data-testid="landmark-list"] a').first();
-  await expect(firstRow).toContainText('Eiffel Tower');
-  await expect(firstRow).toContainText('In range');
+  // landmarks card opens the Landmarks page, reachable only from here
+  await page.getByTestId('home-card-landmark').click();
+  await expect(page.getByTestId('back-button')).toBeVisible();
+  await expect(page.getByTestId('landmark-cards')).toBeVisible();
+  await expect(
+    page.locator('[data-testid="landmark-cards"] [data-testid="stamp-card"]'),
+  ).toHaveCount(203);
   await page.screenshot({ path: shot('03-landmarks') });
 
   // map view renders for the same category
   await page.getByTestId('landmark-view-map').click();
   await expect(page.getByTestId('landmark-map')).toBeVisible();
   await expect(page.locator('.leaflet-container')).toBeVisible();
-  await page.getByTestId('landmark-view-list').click();
-  await expect(page.getByTestId('landmark-list')).toBeVisible();
+  await page.getByTestId('landmark-view-cards').click();
+  await expect(page.getByTestId('landmark-cards')).toBeVisible();
 
-  // collect
-  await firstRow.click();
+  // find and collect the Eiffel Tower
+  await page.getByTestId('landmark-search').fill('Eiffel');
+  await page.locator('[data-testid="landmark-cards"] [data-testid="stamp-card"]').first().click();
+  await page.getByTestId('enable-location').click();
   await page.getByTestId('collect-button').click();
   await expect(page.getByTestId('collected-line')).toContainText(
     'you added the Eiffel Tower stamp to your collection',
@@ -75,40 +79,62 @@ test('register, collect at the Eiffel Tower, add a custom place', async ({ page 
   await expect(page.getByTestId('collected-line')).toBeVisible();
   await expect(page.getByTestId('stamp-photo')).toBeVisible();
 
-  // passport reflects the collection
-  await page.locator('nav').getByRole('link', { name: 'Passport' }).click();
-  await expect(page.locator('[data-testid="stamp-card"][data-collected="true"]')).toHaveCount(1);
+  // home reflects the collection
+  await page.getByTestId('topbar-home').click();
   await expect(page.getByTestId('stats-strip')).toContainText(`1 / ${CURATED_COUNT}`);
-  await page.screenshot({ path: shot('05-passport-collected'), fullPage: true });
+  await page.screenshot({ path: shot('05-home-collected'), fullPage: true });
 
-  // cities and US states tabs are separately browsable
-  await page.locator('nav').getByRole('link', { name: 'Cities' }).click();
-  await expect(page.getByTestId('city-list')).toBeVisible();
-  await page.locator('nav').getByRole('link', { name: 'US States' }).click();
-  await expect(page.getByTestId('us-state-list')).toBeVisible();
-  await expect(page.locator('[data-testid="us-state-list"] a')).toHaveCount(50);
+  // cities and US states cards are separately browsable
+  await page.getByTestId('home-card-city').click();
+  await expect(page.getByTestId('city-cards')).toBeVisible();
+  await page.getByTestId('back-button').click();
+  await page.getByTestId('home-card-us-state').click();
+  await expect(page.getByTestId('us-state-cards')).toBeVisible();
+  await expect(
+    page.locator('[data-testid="us-state-cards"] [data-testid="stamp-card"]'),
+  ).toHaveCount(50);
+  await page.getByTestId('back-button').click();
 
-  // custom place at current location, then collect it
-  await page.locator('nav').getByRole('link', { name: 'Add' }).click();
+  // custom place via the floating Add button, at current location, then collect it
+  await page.getByTestId('add-fab').click();
+  await expect(page.getByTestId('add-place-modal')).toBeVisible();
   await page.getByTestId('place-name').fill('Café de Flore');
   await page.getByTestId('place-country').fill('France');
   await page.getByTestId('use-my-location').click();
   await expect(page.getByTestId('use-my-location')).toContainText('Using your location');
   await page.getByTestId('save-place').click();
+  await expect(page.getByTestId('add-place-modal')).toHaveCount(0);
   await page.getByTestId('collect-button').click();
   await expect(page.getByTestId('collected-line')).toContainText('Café de Flore');
 
-  // stats: 2 stamps, 1 country (both France); custom grid appears
-  await page.locator('nav').getByRole('link', { name: 'Passport' }).click();
-  await expect(page.getByTestId('my-places-grid')).toBeVisible();
+  // stats: 2 stamps, 1 country (both France)
+  await page.getByTestId('topbar-home').click();
   await expect(page.getByTestId('stats-strip')).toContainText(`2 / ${CURATED_COUNT + 1}`);
 
-  // profile: collected-stamps grid and units toggle
-  await page.locator('nav').getByRole('link', { name: 'Profile' }).click();
+  // profile: reached via the top-right avatar; collected-stamps gallery, units toggle,
+  // "My places" list, and a profile-photo upload
+  await page.getByTestId('topbar-profile').click();
   await expect(page.getByTestId('collected-grid')).toBeVisible();
   await expect(page.locator('[data-testid="collected-grid"] [data-testid="stamp-card"]')).toHaveCount(2);
+  await expect(page.getByText('My places')).toBeVisible();
   await page.getByTestId('units-imperial').click();
+
+  await expect(page.getByTestId('profile-photo-tap-target')).toBeVisible();
+  const avatarChooser = page.waitForEvent('filechooser');
+  await page.getByTestId('profile-photo-tap-target').click();
+  const avatarFile = await avatarChooser;
+  await avatarFile.setFiles({
+    name: 'me.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(TEST_PNG_BASE64, 'base64'),
+  });
+  await expect(page.locator('[data-testid="profile-photo-tap-target"] img')).toBeVisible();
+  await expect(page.locator('[data-testid="topbar-profile"] img')).toBeVisible();
   await page.screenshot({ path: shot('06-profile') });
+
+  // the avatar persists across reload (server-side, not client state)
+  await page.reload();
+  await expect(page.locator('[data-testid="profile-photo-tap-target"] img')).toBeVisible();
 });
 
 test('proximity is enforced server-side, not just in the UI', async ({ page, context }) => {
@@ -117,7 +143,7 @@ test('proximity is enforced server-side, not just in the UI', async ({ page, con
   await page.getByTestId('auth-username').fill(username);
   await page.getByTestId('auth-password').fill(password);
   await page.getByTestId('auth-submit').click();
-  await expect(page.getByTestId('passport-grid')).toBeVisible();
+  await expect(page.getByTestId('stats-strip')).toBeVisible();
 
   // bypass the UI: POST NYC coordinates for the Colosseum directly
   const result = await page.evaluate(async (coords) => {
@@ -150,7 +176,7 @@ test('a photo with matching EXIF location collects a stamp remotely', async ({ p
   await page.getByTestId('auth-username').fill(username);
   await page.getByTestId('auth-password').fill(password);
   await page.getByTestId('auth-submit').click();
-  await expect(page.getByTestId('passport-grid')).toBeVisible();
+  await expect(page.getByTestId('stats-strip')).toBeVisible();
 
   const png = `data:image/png;base64,${TEST_PNG_BASE64}`;
   const result = await page.evaluate(async (photo) => {

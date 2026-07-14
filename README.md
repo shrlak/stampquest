@@ -12,11 +12,13 @@ A mobile-first web app where you collect digital stamps from places you visit an
 - **Remote collection with photo evidence** — no GPS needed: upload a photo you already have of the place. It's accepted if the photo's own EXIF location is near the place, or (with photo verification configured) if the photo visibly shows the landmark.
 - **Your photo is the stamp** — every stamp starts as a blank frame; the first photo you add for a place — from collecting in person or via photo evidence — becomes that stamp's artwork, inside the same vintage postage-stamp frame.
 - **281 curated world landmarks** spanning Asia, Europe, the Americas, Africa, and Oceania — including one iconic stop in each of the 50 U.S. states — each rendered in a shared vintage-poster frame (procedural SVG — deterministic per place, zero stored images) until you fill it with your own photo.
-- **Custom places** — add your own spots (café, trailhead, rooftop); each gets a generated stamp in the same style. Private to your account.
+- **Custom places** — add your own spots (café, trailhead, rooftop) from the floating **+** button, wherever you are in the app; each gets a generated stamp in the same style. Private to your account.
 - **Simple accounts** — sign up with just a username and password. Your stamps, custom places, and photos are private to your account; no third-party sign-in required.
-- **Browse by Landmarks, Cities, or US States** — the roster is split into three tabs you can search independently, each with a **list or map view** (the map is a real pannable/zoomable Leaflet map with OpenStreetMap tiles, lazy-loaded so it never costs anyone who stays on list view).
+- **Profile photo** — tap your avatar in the top-right corner or on the profile tab to add or replace your profile picture.
+- **Home landing page** — a stats strip (stamps, countries, continents traveled) up top, then three cards — Landmarks, Cities, US States — each opening into its own browsing page, reached only from here.
+- **Browse by Landmarks, Cities, or US States** — each category page offers a **card or map view** (the map is a real pannable/zoomable Leaflet map with OpenStreetMap tiles, lazy-loaded so it never costs anyone who stays on card view), plus its own search.
 - **Metric or imperial** — a units toggle on your profile switches every distance in the app (collect radius, "how far away," photo-match radius) between the two, remembered per device.
-- **Personal passport** — 2-column stamp album: collected stamps in color, locked ones grayscale; stats for stamps, countries, and continents. Your profile also shows a dedicated gallery of everything you've collected.
+- **Personal passport** — your home page's stats strip tracks stamps, countries, and continents traveled; your profile shows a 3-column gallery of everything you've collected plus the custom places you've added.
 - **Globe-trotting intro** — a one-time animated splash (spinning globe, orbiting plane, landmarks lighting up across every continent) plays when you enter the app, then fades into your passport underneath.
 - **Installable PWA** — add to home screen, standalone display, offline app shell.
 - **Self-contained backend** — Node + Express + SQLite in this repo. No third-party services required.
@@ -88,11 +90,15 @@ On any place you haven't collected yet, the detail page offers **"Collect with a
 
 Either way, the uploaded photo becomes the stamp's artwork — same as collecting in person and adding a photo afterward. Without either vision provider configured, only the EXIF path is available, and the UI explains that when a photo is rejected for having no location data.
 
+## Navigation
+
+Signed-in visitors land on the home page: a stats strip, then three cards — **Landmarks**, **Cities**, **US States**. Tapping a card opens that category's own page (with a back chevron to return home); it isn't reachable any other way. Two things stay on screen everywhere in the app: your profile avatar, top-right, and a circular **+** button, bottom-center, which pops up the add-a-place form without leaving the page you're on.
+
 ## Browsing by category
 
-The curated roster is tagged with a `category` — `landmark`, `city`, or `us-state` — and split into three bottom-nav tabs so you can search each independently instead of scrolling one long list. Custom places you add default to `landmark`. Each tab offers:
+The curated roster is tagged with a `category` — `landmark`, `city`, or `us-state`. Custom places you add default to `landmark`. Each category page offers:
 
-- **List view** — the same searchable, distance-sorted list as before (alphabetical until you grant location).
+- **Card view** — the same 2-column stamp grid as your passport (collected stamps in color, locked ones grayscale), sorted by distance once you've granted location, alphabetical otherwise.
 - **Map view** — a real Leaflet map with OpenStreetMap tiles and a pin per place; tap a pin to jump to that place's detail page. The map library is dynamically imported, so it only downloads if you actually open map view.
 
 ## Units
@@ -101,7 +107,7 @@ A Metric/Imperial toggle on the profile page (persisted in `localStorage`) contr
 
 ## Data model
 
-- `users` — username (unique, 3–24 chars), scrypt password hash
+- `users` — username (unique, 3–24 chars), scrypt password hash, plus an optional profile `photo` BLOB (`photo_mime`, `photo_updated_at`), served via `GET /api/auth/me/photo`
 - `sessions` — random 32-byte tokens, 30-day expiry, httpOnly cookie
 - `places` — curated seed (`is_curated=1`, `art_key` → client art registry) or user-created (`created_by`, private to creator), tagged with a `category`
 - `stamps` — `UNIQUE(user_id, place_id)`, collection time + coordinates + distance, plus an optional `photo` BLOB (`photo_mime`, `photo_updated_at`) — the user's own photo of the place, served via `GET /api/places/:id/photo`
@@ -115,7 +121,7 @@ npx playwright install chromium   # once
 npm run e2e
 ```
 
-The suite builds the client, boots the server on a throwaway database (with `GOOGLE_API_KEY`/`HUGGINGFACE_API_KEY` unset, so the landmark-recognition path is deterministically off), and drives the real app at 390×844 with mocked geolocation: registration → locked passport (blank frames) → the Landmarks tab's list and map views → in-range detection at the Eiffel Tower → collect → add a photo, which becomes the stamp art → persistence across reload → the Cities and US States tabs → custom place creation → the profile's collected-stamps gallery and units toggle → **server-side rejection of far-away coordinates** → **remote collection via matching photo EXIF GPS**, plus rejection of a too-far or location-less photo → auth and privacy checks.
+The suite builds the client, boots the server on a throwaway database (with `GOOGLE_API_KEY`/`HUGGINGFACE_API_KEY` unset, so the landmark-recognition path is deterministically off), and drives the real app at 390×844 with mocked geolocation: registration → home landing page (stats strip, category cards) → the Landmarks card's card and map views → in-range detection at the Eiffel Tower → collect → add a photo, which becomes the stamp art → persistence across reload → the Cities and US States cards → custom place creation via the floating **+** button → the profile's collected-stamps gallery, units toggle, and profile-photo upload → **server-side rejection of far-away coordinates** → **remote collection via matching photo EXIF GPS**, plus rejection of a too-far or location-less photo → auth and privacy checks.
 
 ## Stamp art
 

@@ -2,6 +2,7 @@ export interface User {
   id: number;
   username: string;
   createdAt: string;
+  photoUrl: string | null;
 }
 
 export interface Stats {

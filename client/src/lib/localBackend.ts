@@ -13,6 +13,10 @@ const KEYS = {
   places: 'stampquest.customPlaces',
 };
 
+// The profile photo itself lives in IndexedDB (same store as stamp photos),
+// keyed separately from any place id.
+const PROFILE_PHOTO_KEY = 'stampquest.profile-photo';
+
 interface CustomPlace {
   id: string;
   name: string;
@@ -41,8 +45,8 @@ function store(key: string, value: unknown): void {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
-function profile(): User {
-  let user = load<User | null>(KEYS.profile, null);
+function profile(): Omit<User, 'photoUrl'> {
+  let user = load<Omit<User, 'photoUrl'> | null>(KEYS.profile, null);
   if (!user) {
     user = {
       id: 1,
@@ -102,8 +106,9 @@ function stats(): Stats {
   };
 }
 
-function me(): LocalResult {
-  return { status: 200, data: { user: profile(), stats: stats() } };
+async function me(): Promise<LocalResult> {
+  const photoUrl = (await idbGet(PROFILE_PHOTO_KEY)) ?? null;
+  return { status: 200, data: { user: { ...profile(), photoUrl }, stats: stats() } };
 }
 
 const ok = (data: unknown, status = 200): LocalResult => ({ status, data });
@@ -129,6 +134,15 @@ export async function localRequest(
     return me();
   }
   if (path === '/api/auth/logout') return ok({ ok: true });
+
+  if (path === '/api/auth/me/photo' && method === 'PUT') {
+    const dataUrl = b.photo;
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+      return fail(400, 'INVALID_PHOTO');
+    }
+    await idbSet(PROFILE_PHOTO_KEY, dataUrl);
+    return ok({ user: { ...profile(), photoUrl: dataUrl } });
+  }
 
   if (path === '/api/places' && method === 'GET') return ok({ places: await allPlaces() });
 

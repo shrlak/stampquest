@@ -13,11 +13,16 @@ export const authRouter = Router();
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,24}$/;
 
+const PHOTO_DATA_URL = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/;
+
 function serializeUser(user: UserRow) {
   return {
     id: user.id,
     username: user.username,
     createdAt: user.created_at,
+    photoUrl: user.photo_updated_at
+      ? `/api/auth/me/photo?v=${encodeURIComponent(user.photo_updated_at)}`
+      : null,
   };
 }
 
@@ -86,4 +91,39 @@ authRouter.post('/logout', (req, res) => {
 authRouter.get('/me', requireAuth, (_req, res) => {
   const user = currentUser(res);
   res.json({ user: serializeUser(user), stats: statsFor(user.id) });
+});
+
+// The user's own profile picture — shown on the top-right avatar and profile tab.
+authRouter.put('/me/photo', requireAuth, (req, res) => {
+  const user = currentUser(res);
+  const { photo } = (req.body ?? {}) as Record<string, unknown>;
+  const match = typeof photo === 'string' && photo.match(PHOTO_DATA_URL);
+  if (!match) {
+    res.status(400).json({ error: 'INVALID_PHOTO' });
+    return;
+  }
+  const buffer = Buffer.from(match[2], 'base64');
+  if (buffer.length > 4 * 1024 * 1024) {
+    res.status(413).json({ error: 'PHOTO_TOO_LARGE' });
+    return;
+  }
+  db.prepare(
+    `UPDATE users SET photo = ?, photo_mime = ?, photo_updated_at = datetime('now') WHERE id = ?`,
+  ).run(buffer, `image/${match[1]}`, user.id);
+  const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as UserRow;
+  res.json({ user: serializeUser(updated) });
+});
+
+authRouter.get('/me/photo', requireAuth, (_req, res) => {
+  const user = currentUser(res);
+  const row = db
+    .prepare('SELECT photo, photo_mime FROM users WHERE id = ?')
+    .get(user.id) as { photo: Buffer | null; photo_mime: string | null };
+  if (!row.photo || !row.photo_mime) {
+    res.status(404).json({ error: 'PHOTO_NOT_FOUND' });
+    return;
+  }
+  res.setHeader('Content-Type', row.photo_mime);
+  res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+  res.send(row.photo);
 });

@@ -4,19 +4,21 @@ import { motion } from 'framer-motion';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { LocationProvider } from './hooks/useGeolocation';
 import { UnitsProvider } from './hooks/useUnits';
-import { BottomNav } from './components/BottomNav';
+import { TopBar } from './components/TopBar';
+import { AddFab } from './components/AddFab';
+import { AddPlaceModal } from './components/AddPlaceModal';
 import { GlobeIntro } from './components/GlobeIntro';
 import AuthPage from './pages/AuthPage';
 import PassportPage from './pages/PassportPage';
 import CategoryExplorePage from './pages/CategoryExplorePage';
 import PlaceDetailPage from './pages/PlaceDetailPage';
-import AddPlacePage from './pages/AddPlacePage';
 import ProfilePage from './pages/ProfilePage';
 import GalleryPage from './pages/GalleryPage';
 
 function Shell() {
   const { user, loading } = useAuth();
   const [showIntro, setShowIntro] = useState(true);
+  const [addOpen, setAddOpen] = useState(false);
 
   if (loading) {
     return (
@@ -31,12 +33,16 @@ function Shell() {
       </div>
     );
   }
+  // Unauthenticated visitors land on the login screen; everyone else sees
+  // the passport home page below.
   if (!user) return <Navigate to="/auth" replace />;
   return (
-    <div className="mx-auto min-h-dvh max-w-md pb-24">
+    <div className="mx-auto min-h-dvh max-w-md pt-16 pb-28">
       {showIntro && <GlobeIntro onDone={() => setShowIntro(false)} />}
+      <TopBar />
       <Outlet />
-      <BottomNav />
+      <AddFab onClick={() => setAddOpen(true)} />
+      <AddPlaceModal open={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   );
 }
@@ -55,7 +61,6 @@ export default function App() {
               <Route path="cities" element={<CategoryExplorePage key="city" category="city" />} />
               <Route path="us-states" element={<CategoryExplorePage key="us-state" category="us-state" />} />
               <Route path="place/:id" element={<PlaceDetailPage />} />
-              <Route path="add" element={<AddPlacePage />} />
               <Route path="profile" element={<ProfilePage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

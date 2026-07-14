@@ -42,6 +42,16 @@ if (!placeCols.includes('category')) {
   db.exec(`ALTER TABLE places ADD COLUMN category TEXT NOT NULL DEFAULT 'landmark';`);
 }
 
+// Additive migration for databases created before profile photos existed.
+const userCols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(
+  (c) => c.name,
+);
+if (!userCols.includes('photo')) {
+  db.exec(`ALTER TABLE users ADD COLUMN photo BLOB;
+    ALTER TABLE users ADD COLUMN photo_mime TEXT;
+    ALTER TABLE users ADD COLUMN photo_updated_at TEXT;`);
+}
+
 const placeCount = db
   .prepare('SELECT count(*) AS n FROM places WHERE is_curated = 1')
   .get() as { n: number };
@@ -64,6 +74,9 @@ export interface UserRow {
   id: number;
   username: string;
   password_hash: string;
+  photo: Buffer | null;
+  photo_mime: string | null;
+  photo_updated_at: string | null;
   created_at: string;
 }
 

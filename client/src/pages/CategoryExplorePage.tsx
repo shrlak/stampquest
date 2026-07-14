@@ -1,14 +1,12 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import { useGeo } from '../hooks/useGeolocation';
 import { usePlaces } from '../hooks/usePlaces';
 import { useUnits } from '../hooks/useUnits';
 import { haversineMeters } from '../lib/geo';
-import { Button } from '../components/Button';
-import { DistanceBadge } from '../components/DistanceBadge';
 import { SearchInput } from '../components/SearchInput';
-import { StampSVG } from '../art/StampSVG';
+import { StampCard } from '../components/StampCard';
 import type { PlaceCategory } from '../types';
 
 // Leaflet is a hefty dependency (~150 kB) — only fetch it when someone
@@ -42,13 +40,16 @@ const CATEGORY_META: Record<
   },
 };
 
+// Reached only by tapping a card on the home page — there's no persistent
+// tab for these anymore, so a back chevron is the way home.
 export default function CategoryExplorePage({ category }: { category: PlaceCategory }) {
   const meta = CATEGORY_META[category];
-  const { position, error, loading, request } = useGeo();
+  const navigate = useNavigate();
+  const { position } = useGeo();
   const { places } = usePlaces();
   const { units } = useUnits();
   const [query, setQuery] = useState('');
-  const [view, setView] = useState<'list' | 'map'>('list');
+  const [view, setView] = useState<'cards' | 'map'>('cards');
 
   const categoryPlaces = useMemo(
     () => places?.filter((p) => p.category === category) ?? null,
@@ -62,8 +63,8 @@ export default function CategoryExplorePage({ category }: { category: PlaceCateg
       )
     : null;
 
-  // Sorted by distance once we have a position; otherwise alphabetically, so
-  // search is useful even before location is granted.
+  // Sorted by distance once we have a position (granted from any screen);
+  // otherwise alphabetically, so search is useful even before that.
   const sorted = filtered
     ? filtered
         .map((p) => ({
@@ -78,20 +79,21 @@ export default function CategoryExplorePage({ category }: { category: PlaceCateg
     : null;
 
   return (
-    <div className="px-4 pt-6">
-      <header className="mb-4 flex items-end justify-between">
-        <h1 className="font-display text-3xl">{meta.title}</h1>
-        {view === 'list' && position && (
-          <button
-            type="button"
-            onClick={request}
-            disabled={loading}
-            className="text-sm text-teal underline underline-offset-2 disabled:opacity-50"
-          >
-            {loading ? 'Locating…' : 'Refresh location'}
-          </button>
-        )}
-      </header>
+    <div className="px-4 pt-4">
+      <motion.button
+        type="button"
+        onClick={() => navigate('/')}
+        whileHover={{ backgroundColor: 'rgba(47, 42, 36, 0.06)' }}
+        whileTap={{ scale: 0.88 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+        className="mb-2 flex h-11 w-11 items-center justify-center rounded-full text-2xl"
+        aria-label="Back to home"
+        data-testid="back-button"
+      >
+        ‹
+      </motion.button>
+
+      <h1 className="mb-4 font-display text-3xl">{meta.title}</h1>
 
       {categoryPlaces && categoryPlaces.length > 0 && (
         <div className="mb-4 flex items-center gap-2">
@@ -104,7 +106,7 @@ export default function CategoryExplorePage({ category }: { category: PlaceCateg
             />
           </div>
           <div className="flex shrink-0 rounded-xl border border-ink/10 bg-paper-light p-1">
-            {(['list', 'map'] as const).map((v) => (
+            {(['cards', 'map'] as const).map((v) => (
               <button
                 key={v}
                 type="button"
@@ -114,80 +116,28 @@ export default function CategoryExplorePage({ category }: { category: PlaceCateg
                   view === v ? 'bg-ink text-paper-light' : 'text-ink-soft'
                 }`}
               >
-                {v === 'list' ? 'List' : 'Map'}
+                {v === 'cards' ? 'Cards' : 'Map'}
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {view === 'list' ? (
-        <>
-          {!position && (
-            <div className="mb-5 rounded-2xl border border-ink/10 bg-paper-light p-5 text-center">
-              <svg viewBox="0 0 24 24" className="mx-auto h-8 w-8 fill-teal" aria-hidden>
-                <path d="M12 2a7 7 0 0 1 7 7c0 4.5-4.7 10.3-6.4 12.2a.8.8 0 0 1-1.2 0C9.7 19.3 5 13.5 5 9a7 7 0 0 1 7-7Zm0 4.4A2.6 2.6 0 1 0 12 11.6 2.6 2.6 0 0 0 12 6.4Z" />
-              </svg>
-              <h2 className="mt-2 font-display text-lg">Find stamps near you</h2>
-              <p className="mx-auto mt-1 max-w-64 text-sm text-ink-soft">
-                Enable location to see how far you are from each stamp — get within 500 m to
-                collect.
-              </p>
-              <Button onClick={request} disabled={loading} className="mt-3" data-testid="enable-location">
-                {loading ? 'Locating…' : 'Enable location'}
-              </Button>
-              {error && <p className="mt-3 text-sm text-terracotta">{error}</p>}
-            </div>
-          )}
+      {sorted && sorted.length === 0 && (
+        <p className="mt-10 text-center text-sm text-ink-soft">
+          No {meta.noun} match “{query}”.
+        </p>
+      )}
 
-          {sorted && sorted.length === 0 && (
-            <p className="mt-10 text-center text-sm text-ink-soft">
-              No {meta.noun} match “{query}”.
-            </p>
-          )}
-
-          {sorted && sorted.length > 0 && (
-            <ul className="flex flex-col gap-2 pb-6" data-testid={`${category}-list`}>
-              {sorted.map(({ place, distance }, i) => (
-                <li
-                  key={place.id}
-                  className="animate-card-in"
-                  style={{ animationDelay: `${Math.min(i, 24) * 14}ms` }}
-                >
-                  <motion.div
-                    whileHover={{ x: 3 }}
-                    whileTap={{ scale: 0.98 }}
-                    transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                  >
-                    <Link
-                      to={`/place/${place.id}`}
-                      className="flex items-center gap-3 rounded-xl border border-ink/10 bg-paper-light p-2.5"
-                    >
-                      <div className="w-12 shrink-0">
-                        <StampSVG
-                          subject={place}
-                          photoUrl={place.stamp?.photoUrl}
-                          className={place.stamp ? 'w-full' : 'w-full opacity-60 grayscale'}
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-display">{place.name}</p>
-                        <p className="truncate text-xs text-ink-soft">{place.country}</p>
-                      </div>
-                      {place.stamp ? (
-                        <span className="rounded-full bg-mustard/20 px-2.5 py-1 text-[11px] font-medium text-ink">
-                          Collected
-                        </span>
-                      ) : distance !== null ? (
-                        <DistanceBadge meters={distance} />
-                      ) : null}
-                    </Link>
-                  </motion.div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
+      {view === 'cards' ? (
+        sorted &&
+        sorted.length > 0 && (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-5 pb-6" data-testid={`${category}-cards`}>
+            {sorted.map(({ place }, i) => (
+              <StampCard key={place.id} place={place} index={i} />
+            ))}
+          </div>
+        )
       ) : (
         <div
           className="-mx-4 h-[65vh] overflow-hidden border-y border-ink/10"
