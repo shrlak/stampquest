@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router';
 import { motion } from 'framer-motion';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { LocationProvider } from './hooks/useGeolocation';
 import { BottomNav } from './components/BottomNav';
+import { GlobeIntro } from './components/GlobeIntro';
 import AuthPage from './pages/AuthPage';
 import PassportPage from './pages/PassportPage';
 import ExplorePage from './pages/ExplorePage';
@@ -13,6 +15,7 @@ import GalleryPage from './pages/GalleryPage';
 
 function Shell() {
   const { user, loading } = useAuth();
+  const [showIntro, setShowIntro] = useState(true);
 
   if (loading) {
     return (
@@ -30,6 +33,7 @@ function Shell() {
   if (!user) return <Navigate to="/auth" replace />;
   return (
     <div className="mx-auto min-h-dvh max-w-md pb-24">
+      {showIntro && <GlobeIntro onDone={() => setShowIntro(false)} />}
       <Outlet />
       <BottomNav />
     </div>

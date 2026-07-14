@@ -14,13 +14,14 @@ A mobile-first web app where you collect digital stamps from places you visit an
 - **281 curated world landmarks** spanning Asia, Europe, the Americas, Africa, and Oceania — including one iconic stop in each of the 50 U.S. states — each rendered in a shared vintage-poster frame (procedural SVG — deterministic per place, zero stored images) until you fill it with your own photo.
 - **Custom places** — add your own spots (café, trailhead, rooftop); each gets a generated stamp in the same style. Private to your account.
 - **Sign in with Google** — one-tap account creation and login via Google Identity Services, alongside classic email/password. Either way, your stamps are tied to your account and private to you.
-- **Personal passport** — 2-column stamp album: collected stamps in color, locked ones grayscale; stats for stamps and countries.
+- **Personal passport** — 2-column stamp album: collected stamps in color, locked ones grayscale; stats for stamps, countries, and continents.
+- **Globe-trotting intro** — a one-time animated splash (spinning globe, orbiting plane, landmarks lighting up across every continent) plays when you enter the app, then fades into your passport underneath.
 - **Installable PWA** — add to home screen, standalone display, offline app shell.
 - **Self-contained backend** — Node + Express + SQLite in this repo. No third-party services required (Google sign-in is optional).
 
 ## Stack
 
-- `client/` — Vite, React 19, TypeScript, Tailwind CSS v4, react-router, vite-plugin-pwa, `exifr` for reading a photo's embedded GPS
+- `client/` — Vite, React 19, TypeScript, Tailwind CSS v4, react-router, vite-plugin-pwa, `framer-motion` for animation, `exifr` for reading a photo's embedded GPS
 - `server/` — Express 5, better-sqlite3, session cookies (httpOnly), scrypt password hashing via `node:crypto`, optional Google Sign-In (`google-auth-library`), optional Gemini/Hugging Face vision check for photo-evidence collection
 - `e2e/` — Playwright suite with mocked geolocation at phone viewport
 

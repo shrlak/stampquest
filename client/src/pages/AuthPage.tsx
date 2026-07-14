@@ -91,7 +91,7 @@ export default function AuthPage() {
       </motion.div>
       <h1 className="text-center font-display text-4xl">StampQuest</h1>
       <p className="mt-1 text-center text-sm text-ink-soft">
-        Collect stamps from the places you visit.
+        Collect stamps from landmarks in every corner of the world.
       </p>
 
       <form onSubmit={submit} className="mt-8 flex flex-col gap-3">

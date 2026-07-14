@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { usePlaces } from '../hooks/usePlaces';
 import { StampCard } from '../components/StampCard';
 import { SearchInput } from '../components/SearchInput';
+import { CONTINENT_COUNT, continentOf } from '../lib/continents';
 
 export default function PassportPage() {
   const { user } = useAuth();
@@ -11,6 +12,9 @@ export default function PassportPage() {
 
   const collected = places?.filter((p) => p.stamp) ?? [];
   const countries = new Set(collected.map((p) => p.country));
+  const continents = new Set(
+    collected.map((p) => continentOf(p.country)).filter((c) => c !== undefined),
+  );
 
   const q = query.trim().toLowerCase();
   const matchesQuery = (p: { name: string; country: string }) =>
@@ -25,6 +29,7 @@ export default function PassportPage() {
       <header className="mb-1">
         <p className="text-sm text-ink-soft">{user?.displayName}’s</p>
         <h1 className="font-display text-3xl">Travel Passport</h1>
+        <p className="mt-0.5 text-xs tracking-wide text-ink-soft">Your passport to the world</p>
       </header>
 
       {places && (
@@ -39,6 +44,13 @@ export default function PassportPage() {
           <div className="flex-1 rounded-xl border border-ink/10 bg-paper-light px-3 py-2.5">
             <p className="font-display text-xl leading-none">{countries.size}</p>
             <p className="mt-1 text-[11px] tracking-wide text-ink-soft uppercase">Countries</p>
+          </div>
+          <div className="flex-1 rounded-xl border border-ink/10 bg-paper-light px-3 py-2.5">
+            <p className="font-display text-xl leading-none">
+              {continents.size}
+              <span className="text-sm text-ink-soft"> / {CONTINENT_COUNT}</span>
+            </p>
+            <p className="mt-1 text-[11px] tracking-wide text-ink-soft uppercase">Continents</p>
           </div>
         </div>
       )}
