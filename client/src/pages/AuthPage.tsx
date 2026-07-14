@@ -1,5 +1,6 @@
 import { useCallback, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router';
+import { motion } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/Button';
 import { StampSVG } from '../art/StampSVG';
@@ -70,14 +71,24 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-10">
-      <div className="mx-auto mb-4 w-28 rotate-[-3deg]">
+    <motion.div
+      className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-10"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+    >
+      <motion.div
+        className="mx-auto mb-4 w-28"
+        initial={{ opacity: 0, scale: 0.8, rotate: -3 }}
+        animate={{ opacity: 1, scale: 1, rotate: -3 }}
+        transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+      >
         <StampSVG
           subject={{ id: 'welcome', name: 'StampQuest', country: 'Your travel passport', artKey: 'eiffel' }}
           illustrated
           className="w-full drop-shadow-[0_3px_6px_rgba(47,42,36,0.25)]"
         />
-      </div>
+      </motion.div>
       <h1 className="text-center font-display text-4xl">StampQuest</h1>
       <p className="mt-1 text-center text-sm text-ink-soft">
         Collect stamps from the places you visit.
@@ -146,6 +157,6 @@ export default function AuthPage() {
       >
         {mode === 'signin' ? 'New here? Create an account' : 'Have an account? Sign in'}
       </button>
-    </div>
+    </motion.div>
   );
 }

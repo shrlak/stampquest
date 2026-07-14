@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { motion } from 'framer-motion';
 import { useGeo } from '../hooks/useGeolocation';
 import { usePlaces } from '../hooks/usePlaces';
 import { haversineMeters } from '../lib/geo';
@@ -82,31 +83,41 @@ export default function ExplorePage() {
 
       {sorted && sorted.length > 0 && (
         <ul className="flex flex-col gap-2 pb-6" data-testid="explore-list">
-          {sorted.map(({ place, distance }) => (
-            <li key={place.id}>
-              <Link
-                to={`/place/${place.id}`}
-                className="flex items-center gap-3 rounded-xl border border-ink/10 bg-paper-light p-2.5"
+          {sorted.map(({ place, distance }, i) => (
+            <li
+              key={place.id}
+              className="animate-card-in"
+              style={{ animationDelay: `${Math.min(i, 24) * 14}ms` }}
+            >
+              <motion.div
+                whileHover={{ x: 3 }}
+                whileTap={{ scale: 0.98 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 32 }}
               >
-                <div className="w-12 shrink-0">
-                  <StampSVG
-                    subject={place}
-                    photoUrl={place.stamp?.photoUrl}
-                    className={place.stamp ? 'w-full' : 'w-full opacity-60 grayscale'}
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-display">{place.name}</p>
-                  <p className="truncate text-xs text-ink-soft">{place.country}</p>
-                </div>
-                {place.stamp ? (
-                  <span className="rounded-full bg-mustard/20 px-2.5 py-1 text-[11px] font-medium text-ink">
-                    Collected
-                  </span>
-                ) : distance !== null ? (
-                  <DistanceBadge meters={distance} />
-                ) : null}
-              </Link>
+                <Link
+                  to={`/place/${place.id}`}
+                  className="flex items-center gap-3 rounded-xl border border-ink/10 bg-paper-light p-2.5"
+                >
+                  <div className="w-12 shrink-0">
+                    <StampSVG
+                      subject={place}
+                      photoUrl={place.stamp?.photoUrl}
+                      className={place.stamp ? 'w-full' : 'w-full opacity-60 grayscale'}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-display">{place.name}</p>
+                    <p className="truncate text-xs text-ink-soft">{place.country}</p>
+                  </div>
+                  {place.stamp ? (
+                    <span className="rounded-full bg-mustard/20 px-2.5 py-1 text-[11px] font-medium text-ink">
+                      Collected
+                    </span>
+                  ) : distance !== null ? (
+                    <DistanceBadge meters={distance} />
+                  ) : null}
+                </Link>
+              </motion.div>
             </li>
           ))}
         </ul>

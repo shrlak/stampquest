@@ -1,4 +1,5 @@
 import { Navigate, Outlet, Route, Routes } from 'react-router';
+import { motion } from 'framer-motion';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { LocationProvider } from './hooks/useGeolocation';
 import { BottomNav } from './components/BottomNav';
@@ -12,10 +13,17 @@ import GalleryPage from './pages/GalleryPage';
 
 function Shell() {
   const { user, loading } = useAuth();
+
   if (loading) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
-        <p className="font-display text-xl text-ink-soft">StampQuest</p>
+        <motion.p
+          className="font-display text-xl text-ink-soft"
+          animate={{ opacity: [0.45, 1, 0.45] }}
+          transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          StampQuest
+        </motion.p>
       </div>
     );
   }

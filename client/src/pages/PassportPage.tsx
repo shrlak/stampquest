@@ -64,8 +64,8 @@ export default function PassportPage() {
           )}
           {curated.length > 0 && (
             <div className="grid grid-cols-2 gap-x-4 gap-y-5 pb-6" data-testid="passport-grid">
-              {curated.map((place) => (
-                <StampCard key={place.id} place={place} />
+              {curated.map((place, i) => (
+                <StampCard key={place.id} place={place} index={i} />
               ))}
             </div>
           )}
@@ -73,8 +73,8 @@ export default function PassportPage() {
             <>
               <h2 className="mb-3 font-display text-xl">My places</h2>
               <div className="grid grid-cols-2 gap-x-4 gap-y-5 pb-6" data-testid="my-places-grid">
-                {mine.map((place) => (
-                  <StampCard key={place.id} place={place} />
+                {mine.map((place, i) => (
+                  <StampCard key={place.id} place={place} index={i} />
                 ))}
               </div>
             </>

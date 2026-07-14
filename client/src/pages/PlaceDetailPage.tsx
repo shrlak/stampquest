@@ -1,5 +1,6 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { motion } from 'framer-motion';
 import { usePlace } from '../hooks/usePlaces';
 import { useGeo } from '../hooks/useGeolocation';
 import { useAuth } from '../hooks/useAuth';
@@ -140,14 +141,17 @@ export default function PlaceDetailPage() {
 
   return (
     <div className="px-4 pt-4 pb-8">
-      <button
+      <motion.button
         type="button"
         onClick={() => navigate(-1)}
+        whileHover={{ backgroundColor: 'rgba(47, 42, 36, 0.06)' }}
+        whileTap={{ scale: 0.88 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 28 }}
         className="mb-2 flex h-11 w-11 items-center justify-center rounded-full text-2xl"
         aria-label="Back"
       >
         ‹
-      </button>
+      </motion.button>
 
       <div className={`relative mx-auto w-3/4 max-w-72 ${justCollected ? 'animate-stamp-down' : ''}`}>
         {collected ? (

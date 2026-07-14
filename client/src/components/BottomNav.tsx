@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router';
+import { motion } from 'framer-motion';
 
 const tabs = [
   {
@@ -37,23 +38,31 @@ const tabs = [
 
 export function BottomNav() {
   return (
-    <nav className="fixed bottom-0 left-1/2 z-20 w-full max-w-md -translate-x-1/2 border-t border-ink/10 bg-paper-light/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed bottom-0 left-1/2 z-20 w-full max-w-md -translate-x-1/2 border-t border-ink/10 bg-paper-light/80 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
       <div className="grid grid-cols-4">
         {tabs.map((tab) => (
-          <NavLink
-            key={tab.to}
-            to={tab.to}
-            end={tab.to === '/'}
-            className={({ isActive }) =>
-              `flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] tracking-wide ${
-                isActive ? 'text-terracotta' : 'text-ink-soft'
-              }`
-            }
-          >
-            <svg viewBox="0 0 24 24" className="h-6 w-6 fill-current" aria-hidden>
-              {tab.icon}
-            </svg>
-            {tab.label}
+          <NavLink key={tab.to} to={tab.to} end={tab.to === '/'} className="relative">
+            {({ isActive }) => (
+              <motion.div
+                whileTap={{ scale: 0.88 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+                className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] tracking-wide transition-colors duration-200 ${
+                  isActive ? 'text-terracotta' : 'text-ink-soft'
+                }`}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="bottom-nav-pill"
+                    className="absolute inset-x-3 inset-y-1 rounded-xl bg-terracotta/10"
+                    transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                  />
+                )}
+                <svg viewBox="0 0 24 24" className="relative h-6 w-6 fill-current" aria-hidden>
+                  {tab.icon}
+                </svg>
+                <span className="relative">{tab.label}</span>
+              </motion.div>
+            )}
           </NavLink>
         ))}
       </div>

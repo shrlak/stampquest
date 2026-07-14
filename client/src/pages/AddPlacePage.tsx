@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
+import { motion } from 'framer-motion';
 import { useGeo } from '../hooks/useGeolocation';
 import { api } from '../lib/api';
 import { Button } from '../components/Button';
@@ -63,7 +64,12 @@ export default function AddPlacePage() {
 
       {/* live preview: hashed on the name pre-save, so the final stamp's
           palette (hashed on the real id) may differ — that's fine */}
-      <div className="mx-auto mb-6 w-40 rotate-2">
+      <motion.div
+        className="mx-auto mb-6 w-40 rotate-2"
+        initial={{ opacity: 0, scale: 0.85, rotate: -6 }}
+        animate={{ opacity: 1, scale: 1, rotate: 2 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+      >
         <StampSVG
           subject={{
             id: name.trim() || 'preview-stamp',
@@ -72,7 +78,7 @@ export default function AddPlacePage() {
           }}
           className="w-full drop-shadow-[0_3px_6px_rgba(47,42,36,0.2)]"
         />
-      </div>
+      </motion.div>
 
       <form onSubmit={submit} className="flex flex-col gap-3">
         <input
