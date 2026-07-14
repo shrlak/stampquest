@@ -6,7 +6,8 @@ export const COLLECT_RADIUS_M = 500;
 // Radius for collecting via a photo's EXIF location. More generous than the
 // live-GPS radius: landmark photos are usually taken from a viewpoint some
 // distance away (Trocadéro, Sugarloaf, the rim of the caldera).
-export const PHOTO_RADIUS_M = 5000;
+// Ten statute miles, expressed in meters for all distance calculations.
+export const PHOTO_RADIUS_M = 16093.44;
 
 const EARTH_RADIUS_M = 6371000;
 
