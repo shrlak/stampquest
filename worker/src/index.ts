@@ -92,7 +92,10 @@ interface NominatimResult {
 }
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,24}$/;
-const PASSWORD_ITERATIONS = 120_000;
+// workerd rejects PBKDF2 operations above 100,000 iterations. Keep this at
+// the platform maximum so registration and login work in Cloudflare Workers.
+// https://github.com/cloudflare/workerd/issues/1346
+const PASSWORD_ITERATIONS = 100_000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const MIGRATION_LEASE_MS = 30 * 60 * 1000;
 const PHOTO_DATA_URL = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/;
