@@ -11,20 +11,41 @@ import { fileURLToPath } from 'node:url';
 const outDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'client', 'public', 'icons');
 mkdirSync(outDir, { recursive: true });
 
-// App mark shared with BrandMark.tsx: a globe and outbound flight on an
-// Apple-style blue rounded square.
+// Original picture-stamp mark shared with BrandMark.tsx.
 const iconSvg = (pad) => `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <defs>
-    <linearGradient id="sky" x1="${pad}" y1="${pad}" x2="${512 - pad}" y2="${512 - pad}" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#2997ff"/><stop offset="1" stop-color="#0066cc"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" fill="#f5f5f7"/>
-  <rect x="${pad}" y="${pad}" width="${512 - 2 * pad}" height="${512 - 2 * pad}" rx="${(512 - 2 * pad) * 0.28}" fill="url(#sky)"/>
-  <circle cx="256" cy="244" r="${(512 - 2 * pad) * 0.25}" fill="none" stroke="white" stroke-width="${(512 - 2 * pad) * 0.05}"/>
-  <path d="M${pad + 0.23 * (512 - 2 * pad)} 244H${512 - pad - 0.23 * (512 - 2 * pad)}M256 ${pad + 0.23 * (512 - 2 * pad)}C${256 + 0.16 * (512 - 2 * pad)} ${pad + 0.4 * (512 - 2 * pad)} ${256 + 0.16 * (512 - 2 * pad)} ${512 - pad - 0.4 * (512 - 2 * pad)} 256 ${512 - pad - 0.23 * (512 - 2 * pad)}C${256 - 0.16 * (512 - 2 * pad)} ${512 - pad - 0.4 * (512 - 2 * pad)} ${256 - 0.16 * (512 - 2 * pad)} ${pad + 0.4 * (512 - 2 * pad)} 256 ${pad + 0.23 * (512 - 2 * pad)}Z" fill="none" stroke="white" stroke-width="${(512 - 2 * pad) * 0.036}" stroke-linecap="round"/>
-  <path d="m${512 - pad - 0.31 * (512 - 2 * pad)} ${pad + 0.24 * (512 - 2 * pad)} ${0.25 * (512 - 2 * pad)} ${-0.1 * (512 - 2 * pad)} ${-0.1 * (512 - 2 * pad)} ${0.25 * (512 - 2 * pad)} ${-0.05 * (512 - 2 * pad)} ${-0.05 * (512 - 2 * pad)} ${-0.13 * (512 - 2 * pad)} ${0.13 * (512 - 2 * pad)} ${-0.08 * (512 - 2 * pad)} ${-0.08 * (512 - 2 * pad)} ${0.13 * (512 - 2 * pad)} ${-0.13 * (512 - 2 * pad)}Z" fill="white"/>
+  <rect width="512" height="512" fill="#f6f0e2"/>
+  <g transform="translate(256 256) rotate(-4) translate(-256 -256)">
+    <g transform="translate(${pad} ${pad}) scale(${(512 - 2 * pad) / 360})">
+      <defs>
+        <mask id="perf">
+          <rect x="0" y="0" width="360" height="360" fill="white"/>
+          ${[0, 1, 2, 3, 4, 5, 6, 7, 8]
+            .map((i) => {
+              const p = (360 / 8) * i;
+              return `<circle cx="${p}" cy="0" r="14" fill="black"/>
+                <circle cx="${p}" cy="360" r="14" fill="black"/>
+                <circle cx="0" cy="${p}" r="14" fill="black"/>
+                <circle cx="360" cy="${p}" r="14" fill="black"/>`;
+            })
+            .join('')}
+        </mask>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f4d3a0"/>
+          <stop offset="100%" stop-color="#efae7e"/>
+        </linearGradient>
+      </defs>
+      <g mask="url(#perf)">
+        <rect width="360" height="360" fill="#faf5e9"/>
+        <rect x="36" y="36" width="288" height="288" fill="url(#sky)"/>
+        <circle cx="234" cy="118" r="42" fill="#d96f4e"/>
+        <circle cx="234" cy="118" r="60" fill="none" stroke="#d96f4e" stroke-width="5" opacity="0.35"/>
+        <path d="M36 324 L36 250 L110 148 L162 216 L220 130 L324 260 L324 324 Z" fill="#4a382c"/>
+        <path d="M220 130 L245 162 L233 152 L220 168 L207 152 L196 161 Z" fill="#faf5e9" opacity="0.92"/>
+        <rect x="36" y="36" width="288" height="288" fill="none" stroke="#4a382c" stroke-width="7"/>
+      </g>
+    </g>
+  </g>
 </svg>`;
 
 const html = (svg, size) =>

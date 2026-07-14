@@ -56,6 +56,7 @@ test('register, collect at the Eiffel Tower, add a custom place', async ({ page 
   // find and collect the Eiffel Tower
   await page.getByTestId('landmark-search').fill('Eiffel');
   await page.locator('[data-testid="landmark-cards"] [data-testid="stamp-card"]').first().click();
+  const eiffelUrl = page.url();
   await page.getByTestId('enable-location').click();
   await page.getByTestId('collect-button').click();
   await expect(page.getByTestId('collected-line')).toContainText(
@@ -81,8 +82,12 @@ test('register, collect at the Eiffel Tower, add a custom place', async ({ page 
   await expect(page.getByTestId('stamp-illustration')).toHaveCount(0);
   await expect(page.getByTestId('stamp-lock')).toHaveCount(0);
 
-  // persistence: survives a full reload (server-side stamp + photo, not client state)
+  // A full browser refresh returns to the landing page, while the server-side
+  // stamp and photo still persist when the place is reopened.
   await page.reload();
+  await expect(page.getByTestId('stats-strip')).toContainText(`1 / ${CURATED_COUNT}`);
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto(eiffelUrl);
   await expect(page.getByTestId('collected-line')).toBeVisible();
   await expect(page.getByTestId('stamp-photo')).toBeVisible();
   await expect(page.getByTestId('stamp-lock')).toHaveCount(0);
@@ -145,8 +150,12 @@ test('register, collect at the Eiffel Tower, add a custom place', async ({ page 
   await expect(page.locator('[data-testid="topbar-profile"] img')).toBeVisible();
   await page.screenshot({ path: shot('06-profile') });
 
-  // the avatar persists across reload (server-side, not client state)
+  // Refresh returns home; reopening Profile confirms the server-side avatar
+  // still persists rather than depending on page state.
   await page.reload();
+  await expect(page.getByTestId('stats-strip')).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
+  await page.getByTestId('topbar-profile').click();
   await expect(page.locator('[data-testid="profile-photo-tap-target"] img')).toBeVisible();
 
   // Sign-out closes the account session and restores the login gate.

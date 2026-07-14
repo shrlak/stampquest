@@ -7,16 +7,24 @@ export function BrandMark({ size = 32 }: { size?: number }) {
       aria-hidden="true"
       className="shrink-0"
     >
-      <defs>
-        <linearGradient id="brand-sky" x1="6" y1="5" x2="26" y2="28" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#2997ff" />
-          <stop offset="1" stopColor="#0066cc" />
-        </linearGradient>
-      </defs>
-      <rect width="32" height="32" rx="9" fill="url(#brand-sky)" />
-      <circle cx="16" cy="15" r="8" fill="none" stroke="white" strokeWidth="1.6" />
-      <path d="M8.5 15h15M16 7c2 2.2 3.1 5 3.1 8S18 20.8 16 23c-2-2.2-3.1-5-3.1-8S14 9.2 16 7Z" fill="none" stroke="white" strokeWidth="1.25" strokeLinecap="round" />
-      <path d="m21.1 7.2 5.3-2.1-2.1 5.3-1-1-2.8 2.8-1.6-1.6 2.8-2.8-0.6-0.6Z" fill="white" />
+      <rect width="32" height="32" rx="6" fill="#f6f0e2" />
+      <g transform="translate(16 16) rotate(-4) translate(-16 -16)">
+        <rect
+          x="5"
+          y="5"
+          width="22"
+          height="22"
+          fill="#faf5e9"
+          stroke="#4a382c"
+          strokeWidth="1.6"
+        />
+        <rect x="7.5" y="7.5" width="17" height="17" fill="#efae7e" />
+        <circle cx="20" cy="12" r="2.6" fill="#d96f4e" />
+        <path
+          d="M7.5 24.5 L7.5 20 L12.5 13.5 L15.5 17.5 L19 12.5 L24.5 19.5 L24.5 24.5 Z"
+          fill="#4a382c"
+        />
+      </g>
     </svg>
   );
 }

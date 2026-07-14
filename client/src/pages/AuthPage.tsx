@@ -51,7 +51,7 @@ export default function AuthPage() {
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
     >
       <motion.div
-        className="mx-auto mb-5 rounded-[22px] shadow-[0_14px_36px_rgba(0,113,227,0.24)]"
+        className="mx-auto mb-5 rounded-[18px] shadow-[0_14px_36px_rgba(74,56,44,0.2)]"
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}

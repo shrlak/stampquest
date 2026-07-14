@@ -17,6 +17,7 @@ A mobile-first web app where you collect digital stamps from places you visit an
 - **Simple accounts** — sign up with just a username and password. Your stamps, custom places, and photos are private to your account; no third-party sign-in required. The static Pages build provides the same account gate locally with PBKDF2-hashed passwords and per-account device storage.
 - **Profile photo** — tap your avatar in the top-right corner or on the profile tab to add or replace your profile picture.
 - **Home landing page** — a stats strip (stamps, countries, continents traveled) up top, then three cards — Landmarks, Cities, US States — each opening into its own browsing page, reached only from here.
+- **Refresh returns home** — a full browser refresh always reopens the main passport landing page; normal in-app navigation still preserves the selected place or category.
 - **Browse by Landmarks, Cities, or US States** — each category page offers a **card or map view** (the map is a real pannable/zoomable Leaflet map with OpenStreetMap tiles, lazy-loaded so it never costs anyone who stays on card view), plus its own search.
 - **Metric or imperial** — a units toggle on your profile switches every distance in the app (collect radius, "how far away," photo-match radius) between the two, remembered per device.
 - **Personal passport** — your home page's stats strip tracks stamps, countries, and continents traveled; your profile shows a 3-column gallery of everything you've collected plus the custom places you've added.
@@ -129,4 +130,4 @@ The suite builds the client, boots the server on a throwaway database (with `GOO
 
 Every stamp's frame — perforated edges, palette, caption band, illustration, and album tilt — is generated deterministically from the place's identity. An FNV-1a hash selects the palette, denomination, and fallback scene motif; recognized landmarks use hand-authored silhouette paths from `client/src/art/landmarks.ts`. Before a traveler adds a photo, that artwork remains visible beneath a centered translucent lock. Collecting records the visit, but the lock intentionally stays in place until the traveler takes or uploads their own image. That image then replaces the illustration and the lock disappears. The hidden `/gallery` route remains a lock-free QA sheet for the complete illustration system.
 
-The globe-and-flight app mark is shared by the frosted top bar, favicon, and install icons. Regenerate the PNG variants with `npm run gen-icons` (requires Playwright's Chromium).
+The original picture-stamp mark is shared by the frosted top bar, favicon, and install icons. Regenerate the PNG variants with `npm run gen-icons` (requires Playwright's Chromium).
